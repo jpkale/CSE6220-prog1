@@ -1,13 +1,30 @@
 #include <stdio.h>
-#include <mpi.h>
 #include <stdlib.h>
 
+#include <math.h>
+#include <mpi.h>
+
+#define RADIUS_MAX (1.0)
+#define DEGREES_MAX (360)
+
+#define DEG2RAD(x) (((x)/360.0)*M_PI*2.0)
+#define RANDD(min,max) ((((rand()*1.0)/RAND_MAX)*(max-min))+min)
+
 int dboard(int n) {
-  return 3;
+  int x, y, m, i;
+
+  for (i=0; i<n; i++) {
+    x = RANDD(-1.0, 1.0);
+    y = RANDD(-1.0, 1.0);
+
+    m += (sqrt(pow(x,2) + pow(y,2)) <= 1);
+  }
+
+  return m;
 }
 
 int main(int argc, char *argv[]) {
-  int rank, p, n, r_per_process, r, m, grand_sum, i;
+  int rank, p, n, n_per_process, m_per_process, m, r;
   double pi, time;
 
   /* Init MPI */
@@ -19,9 +36,6 @@ int main(int argc, char *argv[]) {
   /* Get our comm size */
   MPI_Comm_size(MPI_COMM_WORLD, &p);
 
-  /* Seed rand with rank */
-  srand(rank);
-
   /* If we are in rank 0, parse arguments from command line */
   if (rank == 0) {
     if (argc != 3 || sscanf(argv[1], "%d", &n) != 1 || sscanf(argv[2], "%d", &r) != 1) {
@@ -31,28 +45,31 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  /* Divide r equally among all of the processors */
-  r_per_process = r/p;
-  if (m % p && rank < (m % p)) {
-    r_per_process++; 
-  }
-
-  /* Broadcast to the rest of the world */
+  /* Broadcast n and r to the rest of the world */
   MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+  /* Divide n equally among all of the processors */
+  n_per_process = n/p;
+  if ((n % p) && rank < (n % p)) {
+    n_per_process++; 
+  }
+  printf("In rank %d, n_per_process=%d\n", rank, n_per_process);
+
+  /* Seed rand with rank */
+  srand(rank);
 
   /* Start time */
 
-  /* Call dboard r_per_process times in each process */
-  m = 0;
-  for (i = 0; i < r_per_process; i++) {
-    m += dboard(n);
-  }
+  /* Call dboard in each process */
+  m_per_process = dboard(n_per_process);
+
+  printf("In rank %d, m_per_process=%d\n", rank, m_per_process);
 
   /* Reduce the sum into the root */
-  MPI_Reduce(&m, &grand_sum, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+  MPI_Reduce(&m_per_process, &m, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
-  /* Calculate pi */
-  pi = 1.0*grand_sum;
+  /* Average the results we got */
+  pi = (4.0*m)/n;
 
   /* Rank 0 outputs the results */
   if (rank == 0) {
