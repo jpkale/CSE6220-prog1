@@ -10,6 +10,8 @@
 #define DEG2RAD(x) (((x)/360.0)*M_PI*2.0)
 #define RANDD(min,max) ((((rand()*1.0)/RAND_MAX)*(max-min))+min)
 
+#define DEBUG TRUE
+
 int dboard(int n) {
   int x, y, m, i;
 
@@ -25,7 +27,7 @@ int dboard(int n) {
 
 int main(int argc, char *argv[]) {
   int rank, p, n, n_per_process, m_per_process, m, r;
-  double pi, time;
+  double pi, time, pi_sum, pi_avg;
 
   /* Init MPI */
   MPI_Init(&argc, &argv);
@@ -53,7 +55,8 @@ int main(int argc, char *argv[]) {
   if ((n % p) && rank < (n % p)) {
     n_per_process++; 
   }
-  printf("In rank %d, n_per_process=%d\n", rank, n_per_process);
+  if DEBUG:
+	printf("In rank %d, n_per_process=%d\n", rank, n_per_process);
 
   /* Seed rand with rank */
   srand(rank);
@@ -61,15 +64,29 @@ int main(int argc, char *argv[]) {
   /* Start time */
 
   /* Call dboard in each process */
-  m_per_process = dboard(n_per_process);
+  
+  pi_sum = 0.0
+  for (i=0; i<r; i++) {
+	  m_per_process = dboard(n_per_process);
+	  if DEBUG:
+		printf("In rank %d, m_per_process=%d\n", rank, m_per_process);
 
-  printf("In rank %d, m_per_process=%d\n", rank, m_per_process);
+	  MPI_Reduce(&m_per_process, &m, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+	  
+	  if (rank == 0) {
+		  pi = (4.0*m)/n;
+		  pi_sum = pi_sum + pi;
+	  }
+  }
+  //m_per_process = dboard(n_per_process);
+
 
   /* Reduce the sum into the root */
-  MPI_Reduce(&m_per_process, &m, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+  //MPI_Reduce(&m_per_process, &m, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
   /* Average the results we got */
-  pi = (4.0*m)/n;
+  //pi = (4.0*m)/n;
+  pi_avg = pi_sum/r;
 
   /* Rank 0 outputs the results */
   if (rank == 0) {
