@@ -10,12 +10,15 @@
 #define DEG2RAD(x) (((x)/360.0)*M_PI*2.0)
 #define RANDD(min,max) ((((rand()*1.0)/RAND_MAX)*(max-min))+min)
 
-#define DEBUG TRUE
+#define DEBUG (true)
 
 int dboard(int n) {
-  int x, y, m, i;
+  int x, y, m, i, p = 0;
+  
+  MPI_Comm_size(MPI_COMM_WORLD, &p);
+  int nDarts = n/p;
 
-  for (i=0; i<n; i++) {
+  for (i=0; i<nDarts; i++) {
     x = RANDD(-1.0, 1.0);
     y = RANDD(-1.0, 1.0);
 
@@ -26,11 +29,13 @@ int dboard(int n) {
 }
 
 int main(int argc, char *argv[]) {
-  int rank, p, n, n_per_process, m_per_process, m, r;
-  double pi, time, pi_sum, pi_avg;
+  int rank, p, n, n_per_process, m_i, m, r = 0;
+  double pi, time, pi_sum, pi_avg = 0.0;
 
   /* Init MPI */
   MPI_Init(&argc, &argv);
+  
+  double t0 = MPI_Wtime();
 
   /* Get our rank */
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -49,14 +54,15 @@ int main(int argc, char *argv[]) {
 
   /* Broadcast n and r to the rest of the world */
   MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&r, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
   /* Divide n equally among all of the processors */
-  n_per_process = n/p;
-  if ((n % p) && rank < (n % p)) {
-    n_per_process++; 
-  }
-  if DEBUG:
-	printf("In rank %d, n_per_process=%d\n", rank, n_per_process);
+  //n_per_process = n/p;
+  //if ((n % p) && rank < (n % p)) {
+  //  n_per_process++; 
+  //}
+  //if DEBUG
+//	printf("In rank %d, n_per_process=%d\n", rank, n_per_process);
 
   /* Seed rand with rank */
   srand(rank);
@@ -65,15 +71,15 @@ int main(int argc, char *argv[]) {
 
   /* Call dboard in each process */
   
-  pi_sum = 0.0
-  for (i=0; i<r; i++) {
-	  m_per_process = dboard(n_per_process);
-	  if DEBUG:
-		printf("In rank %d, m_per_process=%d\n", rank, m_per_process);
+  pi_sum = 0.0;
+  for (int i=0; i<r; i++) {
+	  //m_per_process = dboard(n_per_process);
+	  m_i = dboard(n);
+	  if DEBUG
+		printf("In rank %d, m_per_process=%d, n=%d, p=%d\n", rank, m_i, n, p);
 
-	  MPI_Reduce(&m_per_process, &m, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-	  
 	  if (rank == 0) {
+		  MPI_Reduce(&m_i, &m, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 		  pi = (4.0*m)/n;
 		  pi_sum = pi_sum + pi;
 	  }
@@ -86,11 +92,13 @@ int main(int argc, char *argv[]) {
 
   /* Average the results we got */
   //pi = (4.0*m)/n;
-  pi_avg = pi_sum/r;
 
   /* Rank 0 outputs the results */
+  double t1 = MPI_Wtime();
   if (rank == 0) {
-    printf("N=%d, R=%d, P=%d, PI=%lf\n", n, r, p, pi);
+	time = t1-t0;
+    pi_avg = pi_sum/r;
+	printf("N=%d, R=%d, P=%d, PI=%lf, PI_AVG=%lf\n", n, r, p, pi, pi_avg);
     printf("Time=%lf\n", time);
   }
 
