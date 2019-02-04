@@ -31,7 +31,9 @@ int dboard(int n) {
     x = sqrt(a) * cos(DEG2RAD(theta));
     y = sqrt(a) * sin(DEG2RAD(theta));
 
-    m += (abs(x) <= RADIUS/sqrt(2.0)) && (abs(y) <= RADIUS/sqrt(2.0));
+    if ((fabs(x) <= RADIUS/sqrt(2.0)) && (fabs(y) <= RADIUS/sqrt(2.0))) {
+      m++;
+    }
   }
 
   return m;

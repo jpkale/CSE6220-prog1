@@ -9,7 +9,7 @@
 # Setup
 cd ~/CSE6220-prog1/
 module load gcc mvapich2/2.2
-mpicpp prog1.cpp -o prog1
+mpic++ prog1.cpp -o prog1
 
 # Run while chainging values of P
 mpirun -np 1 ./prog1 5000000 100
