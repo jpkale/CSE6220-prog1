@@ -1,0 +1,26 @@
+#PBS -N CSE6220-Prog1-Baumann-Delchev-Kale
+#PBS -l nodes=2:ppn=8
+#PBS -l walltime=00:15:00
+#PBS -q coc-ice-multi
+#PBS -o output.txt
+#PBS -m abe
+#PBS -M joseph.kale@gatech.edu
+
+# Setup
+cd ~/CSE6220-prog1/
+module load gcc mvapich2/2.2
+mpicpp prog1.cpp -o prog1
+
+# Run while chainging values of P
+mpirun -np 1 ./prog1 5000000 100
+mpirun -np 2 ./prog1 5000000 100
+mpirun -np 4 ./prog1 5000000 100
+mpirun -np 8 ./prog1 5000000 100
+mpirun -np 16 ./prog1 5000000 100
+
+# Run while changing values of N
+mpirun -np 16 ./prog1 5000000 100
+mpirun -np 16 ./prog1 7000000 100
+mpirun -np 16 ./prog1 9000000 100
+mpirun -np 16 ./prog1 11000000 100
+mpirun -np 16 ./prog1 13000000 100
