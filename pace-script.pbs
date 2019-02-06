@@ -4,7 +4,7 @@
 #PBS -q coc-ice-multi
 #PBS -o output.txt
 #PBS -m abe
-#PBS -M joseph.kale@gatech.edu
+#PBS -M christopher.baumann@gatech.edu
 
 # Setup
 cd ~/CSE6220-prog1/
