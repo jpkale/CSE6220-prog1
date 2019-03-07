@@ -12,16 +12,11 @@ static const unsigned int KILL_SIGNAL = 0xffffffff;
 
 /* Returns true if the first k columns in the solution are valid, and false
  * otherwise */
-bool is_valid_partial_sol(const vector<unsigned int>& sol, unsigned int k) {
-    /* If k is greater than the partial solution, this is invalid */
-    if (k > sol.size()) {
-        return false;
-    }
-
+bool is_valid_partial_sol(const vector<unsigned int>& sol) {
     /* Go through every column in solution and ensure same row value for this
      * column does not appear anywhere else.  If it does, return false */
-    for (unsigned int i=0; i<(k-1); i++) {
-        for (unsigned int j=(i+1); j<k; j++) {
+    for (unsigned int i=0; i<sol.size()-1; i++) {
+        for (unsigned int j=i+1; j<sol.size(); j++) {
             if (sol[i] == sol[j]) {
                 return false;
             }
@@ -30,6 +25,12 @@ bool is_valid_partial_sol(const vector<unsigned int>& sol, unsigned int k) {
 
     /* Found no duplicates, return true */
     return true;
+}
+
+/* Returns true if the vector contains the key.  False otherwise */
+template <class T>
+static bool contains(const vector<T>& v, const T& key) {
+   return find(v.begin(), v.end(), key) != v.end();
 }
 
 /* SolutionTree class, used for generating new partial solutions */
@@ -41,79 +42,85 @@ public:
     unsigned int k;
 
 private:
-    SolutionTree(unsigned int n, unsigned int k, unsigned int value,
-            vector<unsigned int> prevs);
+    tuple<bool, vector<unsigned int>> next_traversal();
     vector<SolutionTree> children;
-    bool is_root;
-    unsigned int value;
+    vector<unsigned int> partial_sol;
+    unsigned int curr_value;
 };
 
-SolutionTree::SolutionTree(unsigned int _n,
-                           unsigned int _k,
-                           unsigned int _value,
-                           vector<unsigned int> prevs) {
-    is_root = false;
-    value = _value;
+SolutionTree::SolutionTree(unsigned int _n, unsigned int _k) {
+    curr_value = 0;
     n = _n;
     k = _k;
 
-    prevs.push_back(value);
-
     /* Base case: no children to add */
-    if (k == 0) {
-        cout << "k=0 basecase" << endl;
+    if (k <= 0) {
         return;
     }
 
-    /* Base case: no unique children to add */
-    if (prevs.size() >= n) { return; }
-
+    /* Add n children to intermediate node */
     for (unsigned int i=0; i<n; i++) {
-        if (find(prevs.begin(), prevs.end(), i) != prevs.end()) {
-            cout << "recurse" << endl;
-            children.push_back(SolutionTree(n, k-1, i, prevs));
-        }
+        children.push_back(SolutionTree(n, k-1));
     }
 }
 
-SolutionTree::SolutionTree(unsigned int _n, unsigned int _k) {
-    is_root = true;
-    n = _n;
-    k = _k;
-
-    for (unsigned int i=0; i<n; i++) {
-        children.push_back(SolutionTree(n, k-1, i, {}));
-    }
-}
-
-tuple<bool, vector<unsigned int>> SolutionTree::next_partial_sol() {
-    // TODO: Fix for 0-size board (n) or k=0
-
-    /* Base case: no children */
+tuple<bool, vector<unsigned int>> SolutionTree::next_traversal() {
+    /* Base case, leaf node */
     if (k == 0) {
         return make_tuple(true, vector<unsigned int>());
     }
 
-    while (!children.empty()) {
+    /* While we still have children left to iterate through */
+    while (curr_value < n) {
 
-        vector<unsigned int> child_sols;
-        bool child_sols_valid;
-        tie(child_sols_valid, child_sols) = children.back().next_partial_sol();
+        /* Get the child's traversal */
+        vector<unsigned int> child_trav;
+        bool child_trav_present;
+        tie(child_trav_present, child_trav) = children[curr_value].next_traversal();
 
-        if (child_sols_valid) {
-            if (!is_root) {
-                child_sols.push_back(value);
-            }
-            cout << "returning valid" << endl;
-            return make_tuple(true, child_sols);
+        /* If there is no child traversal, move onto next child */
+        if (!child_trav_present) {
+            curr_value++;
         }
         else {
-            children.pop_back();
+            if (child_trav.empty()) {
+                /* If the child was a leaf-node, we still need to move onto the
+                 * next child, but also add our current value to the traversal */
+                child_trav.push_back(curr_value);
+                curr_value++;
+            }
+            else {
+                /* Just add our current value and return */
+                child_trav.push_back(curr_value);
+            }
+            return make_tuple(true, child_trav);
         }
     }
 
-    cout << "returning invalid" << endl;
+    /* No valid traversals in any of our children?  Then there's no valid
+     * traversals for us */
     return make_tuple(false, vector<unsigned int>());
+}
+
+tuple<bool, vector<unsigned int>> SolutionTree::next_partial_sol() {
+    vector<unsigned int> trav;
+    bool trav_present;
+
+    do {
+        /* Get the next unique traversal */
+        tie(trav_present, trav) = next_traversal();
+
+        /* If a new unique traversal is not present, a partial solution won't
+         * be either */
+        if (!trav_present) {
+            return make_tuple(false, vector<unsigned int>()); 
+        }
+
+        /* Do this until we have a valid partial solution */
+    } while (!is_valid_partial_sol(trav));
+
+    /* Return our valid partial solution */
+    return make_tuple(trav_present, trav);
 }
 
 static SolutionTree *sol_tree;
@@ -123,6 +130,9 @@ static SolutionTree *sol_tree;
  * call.  When no more unique solutions are available, the boolean in the tuple
  * is false, and the vector is unspecified */
 tuple<bool, vector<unsigned int>> partial_sol(unsigned int n, unsigned int k) {
+
+    /* Create the solution tree for this (n,k) pair if it does not already
+     * exist */
     if (!sol_tree) {
         sol_tree = new SolutionTree(n, k);
     }
@@ -131,32 +141,31 @@ tuple<bool, vector<unsigned int>> partial_sol(unsigned int n, unsigned int k) {
         sol_tree = new SolutionTree(n, k);
     }
 
-    cout << "partial_sol("<<n<<", "<<k<<");"<<endl;
+    /* Return the next partial solution from the tree */
     return sol_tree->next_partial_sol();
 }
 
 /* Create a set of complete solutions from a first-k-column partial solution
  * for a n-by-n size board */
-vector<vector<unsigned int>> complete_sols(vector<unsigned int>& partial_sol,
-                                           unsigned int k,
+vector<vector<unsigned int>> complete_sols(vector<unsigned int> partial_sol,
                                            unsigned int n) {
-    /* Base case, k = n */
-    if (k >= n) { return { partial_sol }; }
+    /* Base case, k >= n */
+    if (partial_sol.size() >= n) { return { partial_sol }; }
 
     /* Create vector of all our complete solutions to return */
     vector<vector<unsigned int>> all_sols;
 
     /* Try new row values for partial_sol[k] */
     for (unsigned int row=0; row<n; row++) {
-        partial_sol.push_back(row);
 
         /* If the new row value we added created a valid partial solution, get
          * all complete solutions from this new partial solution, and append
          * them to our all_sols vector */
-        if (is_valid_partial_sol(partial_sol, k+1)) {
+        if (!contains(partial_sol, row)) {
+            partial_sol.push_back(row);
 
             /* Recursively generate complete_sols for new partial_sol */
-            auto curr_sols = complete_sols(partial_sol, k+1, n);
+            auto curr_sols = complete_sols(partial_sol, n);
 
             /* Append these complete_sols to the end of our all_sols list */
             all_sols.insert(all_sols.end(), curr_sols.begin(),
@@ -179,17 +188,6 @@ void seq_solver(unsigned int n,
 void nqueen_master(unsigned int n,
                    unsigned int k,
                    vector<vector<unsigned int> >& all_solns) {
-	/* Following is a general high level layout that you can follow
-	 (you are not obligated to design your solution in this manner.
-	  This is provided just for your ease). */ 
-
-	/******************* STEP 1: Send one partial solution to each worker ********************/
-	/*
-	 * for (all workers) {
-	 * 		- create a partial solution.
-	 * 		- send that partial solution to a worker
-	 * }
-	 */
 
     /* Get number of processors (and workers) in world */
     int num_procs;
@@ -207,15 +205,10 @@ void nqueen_master(unsigned int n,
      * it to the destination */
     for (unsigned int worker=0; worker<num_workers; worker++) {
         vector<unsigned int> ps;
-        bool ps_valid;
-        tie(ps_valid, ps) = partial_sol(n, k);
+        bool ps_present;
+        tie(ps_present, ps) = partial_sol(n, k);
 
-        if (ps_valid) {
-            cout << "ps_valid: " << ps_valid << endl;
-            cout << "ps.size(): " << ps.size() << endl;
-            cout << "ps[0]: " << ps[0] << endl;
-            cout << "ps[1]: " << ps[1] << endl;
-            cout << "About to isend partial solution" << endl;
+        if (ps_present) {
             /* The partial solution generated was unique and valid */
             MPI_Isend(&ps[0], k, MPI_INT, worker+1, 0, MPI_COMM_WORLD,
                     &reqs[worker]);
@@ -234,17 +227,7 @@ void nqueen_master(unsigned int n,
     }
 
     /* Wait for all of the sends to go through */
-    MPI_Waitall(num_workers, &reqs[0], MPI_STATUS_IGNORE);
-
-	/******************* STEP 2: Send partial solutions to workers as they respond ********************/
-	/*
-	 * while() {
-	 * 		- receive completed work from a worker processor.
-	 * 		- create a partial solution
-	 * 		- send that partial solution to the worker that responded
-	 * 		- Break when no more partial solutions exist and all workers have responded with jobs handed to them
-	 * }
-	 */
+    // MPI_Waitall(num_workers, &reqs[0], MPI_STATUS_IGNORE);
 
     /* Create a vector that holds the number of solutions found by each worker */
     vector<unsigned int> num_sols_found(num_workers);
@@ -255,18 +238,18 @@ void nqueen_master(unsigned int n,
     /* Get the total number of solutions each worker has generated with an
      * async recv call */
     for (unsigned int worker=0; worker<num_workers; worker++) {
-        MPI_Irecv(&num_sols_found[worker], 1, MPI_INT, worker, 0,
+        MPI_Irecv(&num_sols_found[worker], 1, MPI_INT, worker+1, 0,
                 MPI_COMM_WORLD, &reqs[worker]);
     }
 
     /* Continue in while loop while there is some worker process that has not
      * terminated */
-    while (find(has_termed.begin(), has_termed.end(), true) !=
-            has_termed.end()) {
+    while (contains(has_termed, false)) {
+
         /* Create a new partial solution */
         vector<unsigned int> ps;
-        bool ps_valid;
-        tie(ps_valid, ps) = partial_sol(n, k);
+        bool ps_present;
+        tie(ps_present, ps) = partial_sol(n, k);
 
         /* Wait for any worker process to complete */
         MPI_Waitany(num_workers, &reqs[0], &finished_worker,
@@ -275,8 +258,10 @@ void nqueen_master(unsigned int n,
         /* Set m_num_sols as the number of solutions found for this worker */
         unsigned int m_num_sols = num_sols_found[finished_worker];
 
+        cout << "Received " << m_num_sols << " from rank " << finished_worker+1 << endl;
         /* Create a 2D array for solutions */
-        unsigned int *raw_worker_sols = (unsigned int *)malloc(n * m_num_sols);
+        unsigned int *raw_worker_sols = (unsigned int *)malloc(n * m_num_sols *
+                sizeof(unsigned int));
 
         /* Read in all of the solutions found by this processor */
         MPI_Recv(raw_worker_sols, n*m_num_sols, MPI_INT, finished_worker+1, 0,
@@ -289,12 +274,17 @@ void nqueen_master(unsigned int n,
             all_solns.push_back(temp);
         }
 
-        if (ps_valid) {
+        if (ps_present) {
             /* Partial solution is valid */ 
 
             /* Send the new partial solution to the processor which has
              * finished */
             MPI_Send(&ps[0], k, MPI_INT, finished_worker+1, 0, MPI_COMM_WORLD);
+
+            /* Set up asynchronous receive of new completed solution */
+            MPI_Irecv(&num_sols_found[finished_worker], 1, MPI_INT,
+                    finished_worker+1, 0, MPI_COMM_WORLD,
+                    &reqs[finished_worker]);
         }
         else {
             /* Partial does not exist, terminate the processor */
@@ -302,39 +292,10 @@ void nqueen_master(unsigned int n,
                     MPI_COMM_WORLD);
         }
     }
-
-	/********************** STEP 3: Terminate **************************
-	 *
-	 * Send a termination/kill signal to all workers.
-	 *
-	 */
 }
 
 void nqueen_worker(unsigned int n,
                    unsigned int k) {
-
-	// TODO: Implement this function
-
-	// Following is a general high level layout that you can follow (you are not obligated to design your solution in this manner. This is provided just for your ease).
-
-	/*******************************************************************
-	 *
-	 * while() {
-	 *
-	 * 		wait for a message from master
-	 *
-	 * 		if (message is a partial job) {
-	 *				- finish the partial solution
-	 *				- send all found solutions to master
-	 * 		}
-	 *
-	 * 		if (message is a kill signal) {
-	 *
-	 * 				quit
-	 *
-	 * 		}
-	 *	}
-	 */
 
     /* vector of requests so we can use MPI_Waitany */
     vector<MPI_Request> reqs(2);
@@ -347,7 +308,7 @@ void nqueen_worker(unsigned int n,
 
     /* Index of message received from wait any.  0=partial solution, 1=term
      * signal */
-    int recvd_msg;
+    int recvd_msg = 0;
 
     /* Receive both a partial solution and a termination signal from the master
      * asynchronously */
@@ -362,7 +323,8 @@ void nqueen_worker(unsigned int n,
 
         if (recvd_msg == 0) {
             /* Received a partial solution */
-            auto sols = complete_sols(ps, k, n);   
+            auto sols = complete_sols(ps, n);   
+            unsigned int num_sols_found = sols.size();
 
             /* Create a 2D array for solutions */
             unsigned int *raw_worker_sols = (unsigned int *)malloc(n *
@@ -373,10 +335,12 @@ void nqueen_worker(unsigned int n,
                 memcpy(&raw_worker_sols[i*n], &sols[i][0], n);
             }
 
+            /* Send the number of solutions found */
+            MPI_Send(&num_sols_found, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+
             /* Send the 2D array to the master */
             MPI_Send(raw_worker_sols, n*sols.size(), MPI_INT, 0, 0,
                     MPI_COMM_WORLD);
-            cout << "Send result from worker" << endl;
 
             /* Set up asynchronous receive again */
             MPI_Irecv(&ps[0], k, MPI_INT, 0, 0, MPI_COMM_WORLD, &reqs[0]);
