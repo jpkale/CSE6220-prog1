@@ -13,6 +13,9 @@ static const unsigned int KILL_SIGNAL = 0xffffffff;
 /* Returns true if the first k columns in the solution are valid, and false
  * otherwise */
 bool is_valid_partial_sol(const vector<unsigned int>& sol) {
+    /* If solution is an empty vector, return true */
+    if (sol.empty()) { return true; }
+
     /* Go through every column in solution and ensure same row value for this
      * column does not appear anywhere else.  If it does, return false */
     for (unsigned int i=0; i<sol.size()-1; i++) {
@@ -22,7 +25,6 @@ bool is_valid_partial_sol(const vector<unsigned int>& sol) {
             }
         }
     }
-
     /* Found no duplicates, return true */
     return true;
 }
@@ -66,7 +68,8 @@ SolutionTree::SolutionTree(unsigned int _n, unsigned int _k) {
 
 tuple<bool, vector<unsigned int>> SolutionTree::next_traversal() {
     /* Base case, leaf node */
-    if (k == 0) {
+    if (k == 0 && curr_value < n) {
+        curr_value = n+1;
         return make_tuple(true, vector<unsigned int>());
     }
 
