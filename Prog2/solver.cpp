@@ -252,13 +252,13 @@ void nqueen_master(unsigned int n,
         tie(ps_present, ps) = partial_sol(n, k);
 
         /* Wait for any worker process to complete */
+        MPI_Status status;
         MPI_Waitany(num_workers, &reqs[0], &finished_worker,
-                MPI_STATUS_IGNORE);
+                &status);
 
         /* Set m_num_sols as the number of solutions found for this worker */
         unsigned int m_num_sols = num_sols_found[finished_worker];
 
-        cout << "Received " << m_num_sols << " from rank " << finished_worker+1 << endl;
         /* Create a 2D array for solutions */
         unsigned int *raw_worker_sols = (unsigned int *)malloc(n * m_num_sols *
                 sizeof(unsigned int));
@@ -290,6 +290,7 @@ void nqueen_master(unsigned int n,
             /* Partial does not exist, terminate the processor */
             MPI_Send(&KILL_SIGNAL, 1, MPI_INT, finished_worker+1, 1,
                     MPI_COMM_WORLD);
+            has_termed[finished_worker] = true;
         }
     }
 }
@@ -347,6 +348,8 @@ void nqueen_worker(unsigned int n,
         }
         else if (term_sig == KILL_SIGNAL) {
             /* Received a term signal */
+            int rank;
+            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
             return;
         }
     }
