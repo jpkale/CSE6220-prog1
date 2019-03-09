@@ -229,9 +229,6 @@ void nqueen_master(unsigned int n,
         }
     }
 
-    /* Wait for all of the sends to go through */
-    // MPI_Waitall(num_workers, &reqs[0], MPI_STATUS_IGNORE);
-
     /* Create a vector that holds the number of solutions found by each worker */
     vector<unsigned int> num_sols_found(num_workers);
 
@@ -276,6 +273,9 @@ void nqueen_master(unsigned int n,
                     &raw_worker_sols[(i+1)*n*m_num_sols]);
             all_solns.push_back(temp);
         }
+
+        /* Free raw solutions array */
+        free(raw_worker_sols);
 
         if (ps_present) {
             /* Partial solution is valid */ 
@@ -336,7 +336,7 @@ void nqueen_worker(unsigned int n,
 
             /* Fill raw solutions with values from complete solutions */
             for (unsigned int i=0; i<sols.size(); i++) {
-                memcpy(&raw_worker_sols[i*n], &sols[i][0], n);
+                sols[i] = vector<unsigned int>(&raw_worker_sols[i*n], &raw_worker_sols[(i+1)*n]);
             }
 
             /* Send the number of solutions found */
@@ -345,6 +345,9 @@ void nqueen_worker(unsigned int n,
             /* Send the 2D array to the master */
             MPI_Send(raw_worker_sols, n*sols.size(), MPI_INT, 0, 0,
                     MPI_COMM_WORLD);
+
+            /* Free raw woker solutions */
+            free(raw_worker_sols);
 
             /* Set up asynchronous receive again */
             MPI_Irecv(&ps[0], k, MPI_INT, 0, 0, MPI_COMM_WORLD, &reqs[0]);
