@@ -268,9 +268,14 @@ bool is_valid_partial_sol(const vector<unsigned int>& sol) {
 
     /* Go through every column in solution and ensure same row value for this
      * column does not appear anywhere else.  If it does, return false */
-    for (unsigned int i=0; i<sol.size()-1; i++) {
-        for (unsigned int j=i+1; j<sol.size(); j++) {
-            if (sol[i] == sol[j]) {
+    for (unsigned int i=0; i<sol.size(); i++) {
+        for (unsigned int j=0; j<sol.size(); j++) {
+            if (i == j) continue;
+
+            if ((sol[i] == sol[j]) ||
+                ((sol[i]-sol[j]) == (i-j)) ||
+                ((sol[j]-sol[i]) == (j-i)) ||
+                ((sol[i]-sol[j]) == (j-i))) {
                 return false;
             }
         }
@@ -446,10 +451,10 @@ vector<vector<unsigned int>> complete_sols(vector<unsigned int> partial_sol,
         /* If the new row value we added created a valid partial solution, get
          * all complete solutions from this new partial solution, and append
          * them to our all_sols vector */
-        if (!contains(partial_sol, row)) {
-            vector<unsigned int> temp = partial_sol;
-            temp.push_back(row);
+        vector<unsigned int> temp = partial_sol;
+        temp.push_back(row);
 
+        if (is_valid_partial_sol(temp)) {
             /* Recursively generate complete_sols for new partial_sol */
             auto curr_sols = complete_sols(temp, n);
 
