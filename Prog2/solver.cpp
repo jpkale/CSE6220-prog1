@@ -163,8 +163,8 @@ void nqueen_master(unsigned int n,
 
         /* Demarshal raw solutions into vector, and place into all_solns */
         for (unsigned int i=0; i<m_num_sols; i++) {
-            vector<unsigned int> temp(&raw_worker_sols[i*n*m_num_sols],
-                    &raw_worker_sols[(i+1)*n*m_num_sols]);
+            vector<unsigned int> temp(&raw_worker_sols[i*n],
+                    &raw_worker_sols[(i+1)*n]);
             all_solns.push_back(temp);
         }
 
@@ -226,11 +226,16 @@ void nqueen_worker(unsigned int n,
 
             /* Create a 2D array for solutions */
             unsigned int *raw_worker_sols = (unsigned int *)malloc(n *
-                    sols.size());
+                    sols.size() * sizeof(unsigned int));
 
             /* Fill raw solutions with values from complete solutions */
             for (unsigned int i=0; i<sols.size(); i++) {
-                sols[i] = vector<unsigned int>(&raw_worker_sols[i*n], &raw_worker_sols[(i+1)*n]);
+                // cout << "---\n";
+                // for (unsigned int j=0; j<sols[i].size(); j++) {
+                //     cout << sols[i][j] << endl;
+                // }
+                memcpy(&raw_worker_sols[n*i], &sols[i][0],
+                        sols[i].size()*sizeof(unsigned int));
             }
 
             /* Send the number of solutions found */
@@ -442,10 +447,11 @@ vector<vector<unsigned int>> complete_sols(vector<unsigned int> partial_sol,
          * all complete solutions from this new partial solution, and append
          * them to our all_sols vector */
         if (!contains(partial_sol, row)) {
-            partial_sol.push_back(row);
+            vector<unsigned int> temp = partial_sol;
+            temp.push_back(row);
 
             /* Recursively generate complete_sols for new partial_sol */
-            auto curr_sols = complete_sols(partial_sol, n);
+            auto curr_sols = complete_sols(temp, n);
 
             /* Append these complete_sols to the end of our all_sols list */
             all_sols.insert(all_sols.end(), curr_sols.begin(),
