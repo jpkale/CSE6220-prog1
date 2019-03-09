@@ -1,6 +1,7 @@
 #include <mpi.h>
 #include <tuple>
 #include <iostream>
+#include <string.h>
 
 #include "solver.h"
 
