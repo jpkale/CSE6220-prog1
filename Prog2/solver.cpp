@@ -12,22 +12,7 @@ static const unsigned int KILL_SIGNAL = 0xffffffff;
 
 /* Returns true if the first k columns in the solution are valid, and false
  * otherwise */
-bool is_valid_partial_sol(const vector<unsigned int>& sol) {
-    /* If solution is an empty vector, return true */
-    if (sol.empty()) { return true; }
-
-    /* Go through every column in solution and ensure same row value for this
-     * column does not appear anywhere else.  If it does, return false */
-    for (unsigned int i=0; i<sol.size()-1; i++) {
-        for (unsigned int j=i+1; j<sol.size(); j++) {
-            if (sol[i] == sol[j]) {
-                return false;
-            }
-        }
-    }
-    /* Found no duplicates, return true */
-    return true;
-}
+bool is_valid_partial_sol(const vector<unsigned int>& sol);
 
 /* Returns true if the vector contains the key.  False otherwise */
 template <class T>
@@ -50,135 +35,19 @@ private:
     unsigned int curr_value;
 };
 
-SolutionTree::SolutionTree(unsigned int _n, unsigned int _k) {
-    curr_value = 0;
-    n = _n;
-    k = _k;
-
-    /* Base case: no children to add */
-    if (k <= 0) {
-        return;
-    }
-
-    /* Add n children to intermediate node */
-    for (unsigned int i=0; i<n; i++) {
-        children.push_back(SolutionTree(n, k-1));
-    }
-}
-
-tuple<bool, vector<unsigned int>> SolutionTree::next_traversal() {
-    /* Base case, leaf node */
-    if (k == 0 && curr_value < n) {
-        curr_value = n+1;
-        return make_tuple(true, vector<unsigned int>());
-    }
-
-    /* While we still have children left to iterate through */
-    while (curr_value < n) {
-
-        /* Get the child's traversal */
-        vector<unsigned int> child_trav;
-        bool child_trav_present;
-        tie(child_trav_present, child_trav) = children[curr_value].next_traversal();
-
-        /* If there is no child traversal, move onto next child */
-        if (!child_trav_present) {
-            curr_value++;
-        }
-        else {
-            if (child_trav.empty()) {
-                /* If the child was a leaf-node, we still need to move onto the
-                 * next child, but also add our current value to the traversal */
-                child_trav.push_back(curr_value);
-                curr_value++;
-            }
-            else {
-                /* Just add our current value and return */
-                child_trav.push_back(curr_value);
-            }
-            return make_tuple(true, child_trav);
-        }
-    }
-
-    /* No valid traversals in any of our children?  Then there's no valid
-     * traversals for us */
-    return make_tuple(false, vector<unsigned int>());
-}
-
-tuple<bool, vector<unsigned int>> SolutionTree::next_partial_sol() {
-    vector<unsigned int> trav;
-    bool trav_present;
-
-    do {
-        /* Get the next unique traversal */
-        tie(trav_present, trav) = next_traversal();
-
-        /* If a new unique traversal is not present, a partial solution won't
-         * be either */
-        if (!trav_present) {
-            return make_tuple(false, vector<unsigned int>()); 
-        }
-
-        /* Do this until we have a valid partial solution */
-    } while (!is_valid_partial_sol(trav));
-
-    /* Return our valid partial solution */
-    return make_tuple(trav_present, trav);
-}
-
+/* Singleton solution tree */
 static SolutionTree *sol_tree;
 
 /* Given a board size n and partial solution size k, generate a solution to the
  * first k columns of the n-queens problem.  This solution is unique for each
  * call.  When no more unique solutions are available, the boolean in the tuple
  * is false, and the vector is unspecified */
-tuple<bool, vector<unsigned int>> partial_sol(unsigned int n, unsigned int k) {
-
-    /* Create the solution tree for this (n,k) pair if it does not already
-     * exist */
-    if (!sol_tree) {
-        sol_tree = new SolutionTree(n, k);
-    }
-    else if (n != sol_tree->n || k != sol_tree->k) {
-        delete sol_tree;
-        sol_tree = new SolutionTree(n, k);
-    }
-
-    /* Return the next partial solution from the tree */
-    return sol_tree->next_partial_sol();
-}
+tuple<bool, vector<unsigned int>> partial_sol(unsigned int n, unsigned int k);
 
 /* Create a set of complete solutions from a first-k-column partial solution
  * for a n-by-n size board */
 vector<vector<unsigned int>> complete_sols(vector<unsigned int> partial_sol,
-                                           unsigned int n) {
-    /* Base case, k >= n */
-    if (partial_sol.size() >= n) { return { partial_sol }; }
-
-    /* Create vector of all our complete solutions to return */
-    vector<vector<unsigned int>> all_sols;
-
-    /* Try new row values for partial_sol[k] */
-    for (unsigned int row=0; row<n; row++) {
-
-        /* If the new row value we added created a valid partial solution, get
-         * all complete solutions from this new partial solution, and append
-         * them to our all_sols vector */
-        if (!contains(partial_sol, row)) {
-            partial_sol.push_back(row);
-
-            /* Recursively generate complete_sols for new partial_sol */
-            auto curr_sols = complete_sols(partial_sol, n);
-
-            /* Append these complete_sols to the end of our all_sols list */
-            all_sols.insert(all_sols.end(), curr_sols.begin(),
-                    curr_sols.end());
-        }
-    }
-
-    /* Return all the complete solutions we found */
-    return all_sols;
-}
+                                           unsigned int n); 
 
 
 /*************************** solver.h functions ************************/
@@ -359,4 +228,144 @@ void nqueen_worker(unsigned int n,
             return;
         }
     }
+}
+
+
+bool is_valid_partial_sol(const vector<unsigned int>& sol) {
+    /* If solution is an empty vector, return true */
+    if (sol.empty()) { return true; }
+
+    /* Go through every column in solution and ensure same row value for this
+     * column does not appear anywhere else.  If it does, return false */
+    for (unsigned int i=0; i<sol.size()-1; i++) {
+        for (unsigned int j=i+1; j<sol.size(); j++) {
+            if (sol[i] == sol[j]) {
+                return false;
+            }
+        }
+    }
+    /* Found no duplicates, return true */
+    return true;
+}
+
+SolutionTree::SolutionTree(unsigned int _n, unsigned int _k) {
+    curr_value = 0;
+    n = _n;
+    k = _k;
+
+    /* Base case: no children to add */
+    if (k <= 0) {
+        return;
+    }
+
+    /* Add n children to intermediate node */
+    for (unsigned int i=0; i<n; i++) {
+        children.push_back(SolutionTree(n, k-1));
+    }
+}
+
+tuple<bool, vector<unsigned int>> SolutionTree::next_traversal() {
+    /* Base case, leaf node */
+    if (k == 0 && curr_value < n) {
+        curr_value = n+1;
+        return make_tuple(true, vector<unsigned int>());
+    }
+
+    /* While we still have children left to iterate through */
+    while (curr_value < n) {
+
+        /* Get the child's traversal */
+        vector<unsigned int> child_trav;
+        bool child_trav_present;
+        tie(child_trav_present, child_trav) = children[curr_value].next_traversal();
+
+        /* If there is no child traversal, move onto next child */
+        if (!child_trav_present) {
+            curr_value++;
+        }
+        else {
+            if (child_trav.empty()) {
+                /* If the child was a leaf-node, we still need to move onto the
+                 * next child, but also add our current value to the traversal */
+                child_trav.push_back(curr_value);
+                curr_value++;
+            }
+            else {
+                /* Just add our current value and return */
+                child_trav.push_back(curr_value);
+            }
+            return make_tuple(true, child_trav);
+        }
+    }
+
+    /* No valid traversals in any of our children?  Then there's no valid
+     * traversals for us */
+    return make_tuple(false, vector<unsigned int>());
+}
+
+tuple<bool, vector<unsigned int>> SolutionTree::next_partial_sol() {
+    vector<unsigned int> trav;
+    bool trav_present;
+
+    do {
+        /* Get the next unique traversal */
+        tie(trav_present, trav) = next_traversal();
+
+        /* If a new unique traversal is not present, a partial solution won't
+         * be either */
+        if (!trav_present) {
+            return make_tuple(false, vector<unsigned int>()); 
+        }
+
+        /* Do this until we have a valid partial solution */
+    } while (!is_valid_partial_sol(trav));
+
+    /* Return our valid partial solution */
+    return make_tuple(trav_present, trav);
+}
+
+tuple<bool, vector<unsigned int>> partial_sol(unsigned int n, unsigned int k) {
+
+    /* Create the solution tree for this (n,k) pair if it does not already
+     * exist */
+    if (!sol_tree) {
+        sol_tree = new SolutionTree(n, k);
+    }
+    else if (n != sol_tree->n || k != sol_tree->k) {
+        delete sol_tree;
+        sol_tree = new SolutionTree(n, k);
+    }
+
+    /* Return the next partial solution from the tree */
+    return sol_tree->next_partial_sol();
+}
+
+vector<vector<unsigned int>> complete_sols(vector<unsigned int> partial_sol,
+                                           unsigned int n) { 
+    /* Base case, k >= n */
+    if (partial_sol.size() >= n) { return { partial_sol }; }
+
+    /* Create vector of all our complete solutions to return */
+    vector<vector<unsigned int>> all_sols;
+
+    /* Try new row values for partial_sol[k] */
+    for (unsigned int row=0; row<n; row++) {
+
+        /* If the new row value we added created a valid partial solution, get
+         * all complete solutions from this new partial solution, and append
+         * them to our all_sols vector */
+        if (!contains(partial_sol, row)) {
+            partial_sol.push_back(row);
+
+            /* Recursively generate complete_sols for new partial_sol */
+            auto curr_sols = complete_sols(partial_sol, n);
+
+            /* Append these complete_sols to the end of our all_sols list */
+            all_sols.insert(all_sols.end(), curr_sols.begin(),
+                    curr_sols.end());
+        }
+    }
+
+    /* Return all the complete solutions we found */
+    return all_sols;
 }
