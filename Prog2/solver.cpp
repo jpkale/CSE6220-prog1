@@ -8,6 +8,7 @@
 
 using namespace std;
 
+/* Signal to send to worker processes which should terminate */
 static const unsigned int KILL_SIGNAL = 0xffffffff;
 
 /* Returns true if the first k columns in the solution are valid, and false
@@ -23,15 +24,21 @@ static bool contains(const vector<T>& v, const T& key) {
 /* SolutionTree class, used for generating new partial solutions */
 class SolutionTree { 
 public:
+    /* Public constructor of nxn board with k partial solutions */
     SolutionTree(unsigned int n, unsigned int k);
+    /* Get the next unique partial solution, if it exists */
     tuple<bool, vector<unsigned int>> next_partial_sol();
+    /* size of board */
     unsigned int n;
+    /* partial solutions size */
     unsigned int k;
 
 private:
+    /* Get the next traversal, which is not necessarily a solution */
     tuple<bool, vector<unsigned int>> next_traversal();
+    /* The children of any node in the tree */
     vector<SolutionTree> children;
-    vector<unsigned int> partial_sol;
+    /* Current child iterating through */
     unsigned int curr_value;
 };
 
@@ -230,6 +237,7 @@ void nqueen_worker(unsigned int n,
     }
 }
 
+/******************** DECLARE YOUR HELPER FUNCTIONS HERE *******************/
 
 bool is_valid_partial_sol(const vector<unsigned int>& sol) {
     /* If solution is an empty vector, return true */
