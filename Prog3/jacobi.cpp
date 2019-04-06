@@ -30,13 +30,14 @@ double calcL2Norm(const int n, const double* A, const double* b, const double* x
  */
 void matrix_vector_mult(const int n, const double* A, const double* x, double* y)
 {
-    for (int i=0; i<n; i++) {
+    /*for (int i=0; i<n; i++) {
 		y[i] = 0.0;
 		
 		for (int j=0; j<n; j++) {
 			y[i] += A[(i*n)+j] * x[j];
 		}
-	}
+	}*/
+	matrix_vector_mult(n,n,A,x,y);
 }
 
 // Calculates y = A*x for a n-by-m matrix A, a m-dimensional vector x
