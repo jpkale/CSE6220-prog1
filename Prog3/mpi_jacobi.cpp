@@ -17,6 +17,10 @@
 #include <math.h>
 #include <vector>
 
+#define ROW 0
+#define COL 1
+#define NDIMS 2
+
 /*
  * TODO: Implement your solutions here
  */
@@ -79,7 +83,68 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
  */
 void transpose_bcast_vector(const int n, double* col_vector, double* row_vector, MPI_Comm comm)
 {
-    // TODO
+    int dims[NDIMS], periods[NDIMS], coords[NDIMS];
+    int col_vector_size;
+
+    /* Get cartesian coordiantes */
+    MPI_Cart_get(comm, NDIMS, dims, periods, coords);
+
+    /* Set col_vector_size to floor(n/q) or ceil(n/q) */
+    col_vector_size = n/coords[ROW];
+    if (coords[ROW] <= n % dims[ROW]) {
+        col_vector_size += 1;
+    }
+
+    /* 0-th column processor */
+    if (coords[COL] == 0) {
+        int diag_coords[NDIMS];
+        int diag_rank;
+
+        /* Populate diag_coords */
+        diag_coords[ROW] = coords[ROW];
+        diag_coords[COL] = coords[ROW];
+
+        /* Get the rank of the diagonal processor */
+        MPI_Cart_rank(comm, diag_coords, &diag_rank);
+
+        /* Send our part of the vector to the diagonal processor */
+        MPI_Send(col_vector, col_vector_size, MPI_DOUBLE, diag_rank, 0, comm);
+    }
+
+    /* Diagonal processor */
+    if (coords[ROW] == coords[COL]) {
+        int first_coords[NDIMS];
+        int first_rank;
+
+        /* Populate first_coords */
+        first_coords[ROW] = coords[ROW];
+        first_coords[COL] = 0;
+
+        /* Get the rank of the first processor in the row */
+        MPI_Cart_rank(comm, first_coords, &first_rank);
+
+        /* Receive our part of the vector from the first processor in the row */
+        MPI_Recv(col_vector, col_vector_size, MPI_DOUBLE, first_rank, 0, comm,
+                MPI_STATUS_IGNORE);
+    }
+
+    /* At this point, the diagonal column has the distributed vector in
+     * col_vector */
+
+    MPI_Comm col_comm;
+
+    /* Create communicator for column.  We use the column in the cart
+     * communicator as our color to ensure all columns are in a unique new
+     * communicator.  Additionally, if the processor is the diagonal processor
+     * in a column, it has the key 0, while all other processors have key 1.
+     * This ensures that we can use root=0 when we broadcast */
+    MPI_Comm_split(comm, coords[COL], coords[ROW] == coords[COL] ? 0 : 1, &col_comm);
+
+    /* Broadcast into new communicator */
+    MPI_Bcast(col_vector, col_vector_size, MPI_DOUBLE, 0, col_comm);
+
+    /* Cleanup */
+    MPI_Comm_free(&col_comm);
 }
 
 /*
