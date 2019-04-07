@@ -33,7 +33,20 @@
  */
 void distribute_vector(const int n, double* input_vector, double** local_vector, MPI_Comm comm)
 {
-    // TODO
+    int dims[2], periods[2], coords[2];
+
+    /* Get coords in the cart communicator */
+    MPI_Cart_get(comm, 2, dims, periods, coords);
+
+    /* Create communicator for 0-th column */
+
+    /* Get our rank in the new communicator */
+
+    /* Allocate local_vector accoring to our rank */
+
+    /* Scatter input vector to new communicator */
+
+    /* Clean up */
 }
 
 /*
