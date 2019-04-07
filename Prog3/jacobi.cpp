@@ -86,6 +86,11 @@ void jacobi(const int n, double* A, double* b, double* x, int max_iter, double l
 		// R = A-D
 		R[n*i + i] = 0.0;
 	}
+
+    // x <- [0 0 ... 0]
+    for (int i=0; i<n; i++) {
+        x[i] = 0.0;
+    }
 	
 	int iterCount = 0;
 	double norm = 0.0;
