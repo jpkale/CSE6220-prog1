@@ -289,16 +289,13 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
 void transpose_bcast_vector(const int n, double* col_vector, double* row_vector, MPI_Comm comm)
 {
     int dims[NDIMS], periods[NDIMS], coords[NDIMS];
-    int col_vector_size;
+    int vector_size;
 
     /* Get cartesian coordiantes */
     MPI_Cart_get(comm, NDIMS, dims, periods, coords);
 
-    /* Set col_vector_size to floor(n/q) or ceil(n/q) */
-    col_vector_size = n/coords[ROW];
-    if (coords[ROW] <= n % dims[ROW]) {
-        col_vector_size += 1;
-    }
+    /* Set vector_size to floor(n/q) or ceil(n/q) */
+    vector_size = block_decompose_by_dim(n, comm, COL);
 
     /* 0-th column processor */
     if (coords[COL] == 0) {
@@ -313,7 +310,7 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
         MPI_Cart_rank(comm, diag_coords, &diag_rank);
 
         /* Send our part of the vector to the diagonal processor */
-        MPI_Send(col_vector, col_vector_size, MPI_DOUBLE, diag_rank, 0, comm);
+        MPI_Send(col_vector, vector_size, MPI_DOUBLE, diag_rank, 0, comm);
     }
 
     /* Diagonal processor */
@@ -329,7 +326,7 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
         MPI_Cart_rank(comm, first_coords, &first_rank);
 
         /* Receive our part of the vector from the first processor in the row */
-        MPI_Recv(col_vector, col_vector_size, MPI_DOUBLE, first_rank, 0, comm,
+        MPI_Recv(row_vector, vector_size, MPI_DOUBLE, first_rank, 0, comm,
                 MPI_STATUS_IGNORE);
     }
 
@@ -346,7 +343,7 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
     MPI_Comm_split(comm, coords[COL], coords[ROW] == coords[COL] ? 0 : 1, &col_comm);
 
     /* Broadcast into new communicator */
-    MPI_Bcast(col_vector, col_vector_size, MPI_DOUBLE, 0, col_comm);
+    MPI_Bcast(row_vector, vector_size, MPI_DOUBLE, 0, col_comm);
 
     /* Cleanup */
     MPI_Comm_free(&col_comm);
