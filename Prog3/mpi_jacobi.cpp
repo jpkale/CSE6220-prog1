@@ -33,7 +33,6 @@
  */
 void distribute_vector(const int n, double* input_vector, double** local_vector, MPI_Comm comm)
 {
-    // TODO
 	int rank = 0;
 	int coordinates[2];
 	
@@ -107,7 +106,6 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
 // gather the local vector distributed among (i,0) to the processor (0,0)
 void gather_vector(const int n, double* local_vector, double* output_vector, MPI_Comm comm)
 {
-    // TODO
 	int rank = 0;
 	int coordinates[2];
 	
