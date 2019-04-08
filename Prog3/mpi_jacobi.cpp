@@ -364,7 +364,27 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
  */
 void distributed_matrix_vector_mult(const int n, double* local_A, double* local_x, double* local_y, MPI_Comm comm)
 {
-    // TODO
+    int num_rows, num_cols;
+    std::vector<double> transposed_x(n);
+
+    /* Transpose x and distribute */
+    transpose_bcast_vector(n, local_x, &transposed_x[0], comm);
+
+    /* Determine num_rows and num_cols */
+    num_rows = block_decompose_by_dim(n, comm, ROW);
+    num_cols = block_decompose_by_dim(n, comm, COL);
+
+    /* Initialize local_y = [0; 0; ... 0] */
+    for (int row=0; row<num_rows; row++) {
+        local_y[row] = 0.0;
+    }
+
+    /* Calculate y = A*x, row-by-row */
+    for (int row=0; row<num_rows; row++) {
+        for (int col=0; col<num_cols; col++) {
+            local_y[row] += local_A[row * num_rows + col] * transposed_x[col];
+        }
+    }
 }
 
 /*
