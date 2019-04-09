@@ -38,24 +38,26 @@
 void distribute_vector(const int n, double* input_vector, double** local_vector, MPI_Comm comm)
 {
 	int rank = 0;
-	int coordinates[2];
+	int coordinates[NDIMS];
 	
 	//Get rank and coordinates
 	MPI_Comm_rank(comm, &rank);
-	MPI_Cart_coords(comm, rank, 2, coordinates);
+	MPI_Cart_coords(comm, rank, NDIMS, coordinates);
 	
 	//Create Column Communicator subset group for scattering vector
 	MPI_Comm colComm;
-	int remain_dims[2] = {true, false};
+	int remain_dims[NDIMS];
+    remain_dims[ROW] = true;
+    remain_dims[COL] = false;
 	MPI_Cart_sub(comm, remain_dims, &colComm);
 	
 	// Create communication groups
 	MPI_Group cartesianGroup, columnGroup;
 	MPI_Comm_group(comm, &cartesianGroup);
-	MPI_Comm_group(comm, &columnGroup);
+	MPI_Comm_group(colComm, &columnGroup);
 	
 	//If not in the first column of processor grid, do nothing
-	if (coordinates[1] != 0)
+	if (coordinates[COL] != 0)
 	{
 		MPI_Group_free(&cartesianGroup);
 		MPI_Group_free(&columnGroup);
@@ -64,17 +66,17 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
 	}
 	
 	//Calculate num of elements for each processor
-	int dims[2], periods[2], coords[2];
-	MPI_Cart_get(comm,2,dims,periods,coords);
+	int dims[NDIMS], periods[NDIMS], coords[NDIMS];
+	MPI_Cart_get(comm,NDIMS,dims,periods,coords);
 	
-	int* count = new int[dims[0]];
-	count[0] = block_decompose(n,dims[0],0);
+	int* count = new int[dims[ROW]];
+	count[0] = block_decompose(n,dims[ROW],0);
 	
-	int* displs = new int[dims[0]];
+	int* displs = new int[dims[ROW]];
 	displs[0] = 0;
 	
-	for (int i=0; i < dims[0]; i++) {
-		count[i] = block_decompose(n,dims[0],i);
+	for (int i=1; i < dims[ROW]; i++) {
+		count[i] = block_decompose(n,dims[ROW],i);
 		displs[i] = displs[i-1] + count[i-1];
 	}
 	
@@ -82,14 +84,15 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
 	int rankRoot;
 	int coordRoot[] = {0,0};
 	MPI_Cart_rank(comm, coordRoot, &rankRoot);
-	
+
 	//Scatter
-	int size = block_decompose(n,dims[0], coordinates[0]);
+	int size = block_decompose(n, dims[ROW], coordinates[ROW]);
 	(*local_vector) = new double[size];
 	int translationRank;
 	MPI_Group_translate_ranks(cartesianGroup, 1, &rankRoot, columnGroup, &translationRank);
-	MPI_Scatterv(input_vector, count, displs, MPI_DOUBLE, *local_vector, size, MPI_DOUBLE, translationRank, colComm);
-	
+    MPI_Scatterv(input_vector, count, displs, MPI_DOUBLE, *local_vector, size, MPI_DOUBLE, translationRank, colComm);
+
+
 	MPI_Group_free(&cartesianGroup);
 	MPI_Group_free(&columnGroup);
 	MPI_Comm_free(&colComm);
