@@ -47,7 +47,52 @@ inline int block_decompose_by_dim(const int n, MPI_Comm comm, int dim)
  *                  DECLARE YOUR OWN FUNCTIONS HERE                  *
  *********************************************************************/
 
-// ...
+#define ROW 0
+#define COL 1
+#define NDIMS 2
 
+/* TODO: Move the all to cpp file, memoize*/
+
+inline int get_row(MPI_Comm comm)
+{
+    int dims[NDIMS], periods[NDIMS], coords[NDIMS];
+    MPI_Cart_get(comm, NDIMS, dims, periods, coords);
+    return coords[ROW];
+}
+
+inline int get_col(MPI_Comm comm)
+{
+    int dims[NDIMS], periods[NDIMS], coords[NDIMS];
+    MPI_Cart_get(comm, NDIMS, dims, periods, coords);
+    return coords[COL];
+}
+
+inline int get_rank(MPI_Comm comm)
+{
+    int rank;
+    MPI_Comm_rank(comm, &rank);
+    return rank;
+}
+
+inline int get_cart_root_rank(MPI_Comm comm)
+{
+    int rank, coords[NDIMS];
+    coords[0] = 0;
+    coords[1] = 0;
+    MPI_Cart_rank(comm, coords, &rank);
+    return rank;
+}
+
+inline int get_num_rows(MPI_Comm comm) {
+    int dims[NDIMS], period[NDIMS], coords[NDIMS];
+    MPI_Cart_get(comm, NDIMS, dims, period, coords);
+    return dims[ROW];
+}
+
+inline int get_num_cols(MPI_Comm comm) {
+    int dims[NDIMS], period[NDIMS], coords[NDIMS];
+    MPI_Cart_get(comm, NDIMS, dims, period, coords);
+    return dims[COL];
+}
 
 #endif // UTILS_H
