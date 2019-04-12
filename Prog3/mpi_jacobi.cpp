@@ -279,18 +279,6 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
                      commRankRowRoot, rowComm);
 	}
 
-#if 0
-    printf("In rank %d (%d,%d), local_matrix = [\n", get_rank(comm), get_row(comm), get_col(comm));
-    for (int i=0; i<rows; i++) {
-        for (int j=0; j<columns; j++) {
-            printf(" %lf", (*local_matrix)[i*rows + j]);
-        }
-        printf("\n");
-    }
-    printf("]\n");
-
-#endif /* 1 */
-
     /* Clean-up */
 	delete count;
 	delete displs;
@@ -356,14 +344,6 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
         /* Receive our part of the vector from the first processor in the row */
         MPI_Recv(row_vector, vector_size, MPI_DOUBLE, first_rank, 0, comm,
                 MPI_STATUS_IGNORE);
-
-#if 0
-        printf("In rank %d (%d,%d), (before bcast) row_vector = [", get_rank(comm), get_row(comm), get_col(comm));
-        for (int i=0; i<vector_size; i++) {
-            printf(" %lf", row_vector[i]);
-        }
-        printf("]\n");
-#endif
     }
 
     /* At this point, the diagonal column has the distributed vector in
@@ -392,15 +372,8 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
     MPI_Group_translate_ranks(cart_group, 1, &diag_rank, col_group, &col_diag_rank);
 
     /* Broadcast into new communicator */
-    MPI_Bcast(row_vector, vector_size, MPI_DOUBLE, col_diag_rank, col_comm);
-
-#if 0
-    printf("In rank %d (%d,%d), (after bcast) row_vector = [", get_rank(comm), get_row(comm), get_col(comm));
-    for (int i=0; i<vector_size; i++) {
-        printf(" %lf", row_vector[i]);
-    }
-    printf("]\n");
-#endif
+    int bcast_vector_size = block_decompose_by_dim(n, comm, COL);
+    MPI_Bcast(row_vector, bcast_vector_size, MPI_DOUBLE, col_diag_rank, col_comm);
 
     /* Cleanup */
     MPI_Comm_free(&col_comm);
@@ -428,7 +401,7 @@ void distributed_matrix_vector_mult(const int n, double* local_A, double* local_
 
     /* Determine num_rows */
     num_rows = block_decompose_by_dim(n, comm, ROW);
-    num_cols = block_decompose_by_dim(n, comm, ROW);
+    num_cols = block_decompose_by_dim(n, comm, COL);
 
     /* Allocate new vector for partial result */
     std::vector<double> partial_res(num_rows);
@@ -438,22 +411,12 @@ void distributed_matrix_vector_mult(const int n, double* local_A, double* local_
         partial_res[row] = 0.0;
     }
 
-
     /* Calculate y = A*x, row-by-row */
     for (int row=0; row<num_rows; row++) {
         for (int col=0; col<num_cols; col++) {
             partial_res[row] += local_A[row * num_cols + col] * transposed_x[col];
         }
     }
-
-#if 0
-    printf("In rank %d (%d,%d), partial_res = [\n", get_rank(comm), get_row(comm), get_col(comm));
-    for (int i=0; i<num_rows; i++) {
-        printf(" %lf\n", partial_res[i]);
-    }
-    printf("]\n");
-
-#endif
 
     /* Create communicator for current row */
     int remain_dims[NDIMS];
