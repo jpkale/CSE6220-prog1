@@ -460,7 +460,123 @@ void distributed_matrix_vector_mult(const int n, double* local_A, double* local_
 void distributed_jacobi(const int n, double* local_A, double* local_b, double* local_x,
                 MPI_Comm comm, int max_iter, double l2_termination)
 {
-    // TODO
+    int rank;
+	int coordinates[2];
+	MPI_Comm_rank(comm, &rank);
+	MPI_Cart_coords(comm, rank, 2, coordinates);
+	
+	int dims[2];
+	int period[2];
+	int coords[2];
+	MPI_Cart_get(comm,2,dims,period,coords);
+	
+	int rankRoot;	
+	int rankRowRoot;
+	int rankRootDiag;
+	int coordsRoot[2] = {0,0};
+	int coordsRowRoot[2] = {coordinates[0], 0};
+	int coordsRootDiag[2] = {coordinates[0], coordinates[0]};
+	MPI_Cart_rank(comm, coordsRoot, &rankRoot);
+	MPI_Cart_rank(comm, coordsRowRoot, &rankRowRoot);
+	MPI_Cart_rank(comm, coordsRootDiag, &rankRootDiag);
+	
+	int rows = block_decompose(n, dims[0], coordinates[0]);
+	
+	double* diagonal = NULL;
+	if(coordinates[1] == 0) {
+		diagonal = new double[rows];
+		
+		if (rank != rankRootDiag) {
+			for(int i=0; i < rows; i++) {
+				MPI_Recv(diagonal + i, 1, MPI_DOUBLE, rankRootDiag, MPI_ANY_TAG, comm, MPI_STATUS_IGNORE);
+			}
+		}
+		else {
+			for (int i=0; i < rows; i++) {
+				diagonal[i] = local_A[i * rows + 1];
+			}
+		}
+		
+		for (int i = 0; i < rows; i++) { 
+			local_x[i] = 0;
+		}
+	}
+	else if (rank == rankRootDiag) {
+		for (int i = 0; i < rows; i++) {
+			MPI_Send((local_A + i * rows + i), 1, MPI_DOUBLE, rankRowRoot, 1, comm);
+		}
+	}
+	
+	double* resultAx = NULL;
+	if (coordinates[1] == 0) {
+		resultAx = new double[rows];
+	}
+	
+	MPI_Comm colComm;
+	int remain_dims[2] = {true, false};
+	MPI_Cart_sub(comm, remain_dims, &colComm);
+	
+	MPI_Group groupCart, groupCol;
+	MPI_Comm_group(comm, &groupCart);
+	MPI_Comm_group(colComm, &groupCol);
+	
+	int rankCommRoot;
+	MPI_Group_translate_ranks(groupCart, 1, &rankRoot, groupCol, &rankCommRoot);
+	
+	double resultLocal;
+	double residual;
+	int iterations = 0;
+	
+	while(1) {
+		distributed_matrix_vector_mult(n, local_A, local_x, resultAx, comm);
+		
+		if (coordinates[1] == 0) {
+			resultLocal = 0;
+			for(int i = 0; i < rows; i++) {
+				resultLocal = resultLocal + (resultAx[i] - local_b[i]) * (resultAx[i] - local_b[i]);
+			}
+			MPI_Reduce(&resultLocal, &residual, 1, MPI_DOUBLE, MPI_SUM, rankCommRoot, colComm);
+		}
+		
+		if (rank == rankRoot) {
+			residual = sqrt(residual);
+		}
+		
+		MPI_Bcast(&residual, 1, MPI_DOUBLE, rankRoot, comm);
+		
+		if (iterations < max_iter) {
+			if (residual < l2_termination) {
+				std::cout<<"Iteration meets L2 termination condition"<<std::endl;
+				break;
+			}
+			else {
+				if (coordinates[1] == 0) {
+					for (int i=0; i < rows; i++) {
+						local_x[i] = (local_b[i] - resultAx[i] + diagonal[i]*local_x[i]) / diagonal[i];
+					}
+				}
+				iterations++;
+			}
+		}
+		else if(residual < l2_termination) {
+			std::cout<<"Iteration meets L2 termination condition"<<std::endl;
+			break;
+		}
+		else {
+			std::cout<<"Reached max_iter without converging"<<std::endl;
+			break;
+		}
+	}
+	
+	delete resultAx;
+	delete diagonal;
+	MPI_Comm_free(&colComm);
+	MPI_Group_free(&groupCart);
+	MPI_Group_free(&groupCol);
+	
+	return;
+	
+
 }
 
 /*
