@@ -220,7 +220,8 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
 	MPI_Comm_group(comm, &groupCart);
 	MPI_Comm_group(colComm, &groupCol);
 	MPI_Comm_group(rowComm, &groupRow);
-	
+
+    /* Distribute matrix among processors in first column */
 	double* temp = NULL;
 	if (col == 0) {
 		int* count = new int[cart_comm_cols];
@@ -246,18 +247,9 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
 	}
 
 	MPI_Barrier(comm);
-
-    // if (col == 0) {
-    //     printf("In rank %d (%d, %d), temp = [", rank, row, col);
-    //     for (int i=0; i<n*block_decompose(n, cart_comm_cols, col); i++) {
-    //         printf(" %lf, ", temp[i]);
-    //     }
-    //     printf("]\n");
-    // }
 	
-	// SCATTER
 	int rows = block_decompose(n, cart_comm_rows, row);
-	int columns = block_decompose(n, cart_comm_cols, row);
+	int columns = block_decompose(n, cart_comm_cols, col);
 	(*local_matrix) = new double[rows*columns];
 	
 	int rankColRoot;
@@ -279,12 +271,27 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
 	int commRankRowRoot;
 	MPI_Group_translate_ranks(groupCart, 1, &rankColRoot, groupRow, &commRankRowRoot);
 
+    /* Distribute matrix from processors in first column to all processors in
+     * the same row */
 	for (int i=0; i < rows; i++) {
 		MPI_Scatterv((temp + i*n), count, displs, MPI_DOUBLE,
                      (*local_matrix + i*columns), columns, MPI_DOUBLE,
                      commRankRowRoot, rowComm);
 	}
-	
+
+#if 0
+    printf("In rank %d (%d,%d), local_matrix = [\n", get_rank(comm), get_row(comm), get_col(comm));
+    for (int i=0; i<rows; i++) {
+        for (int j=0; j<columns; j++) {
+            printf(" %lf", (*local_matrix)[i*rows + j]);
+        }
+        printf("\n");
+    }
+    printf("]\n");
+
+#endif /* 1 */
+
+    /* Clean-up */
 	delete count;
 	delete displs;
 	delete temp;
@@ -310,23 +317,22 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
  */
 void transpose_bcast_vector(const int n, double* col_vector, double* row_vector, MPI_Comm comm)
 {
-    int dims[NDIMS], periods[NDIMS], coords[NDIMS];
-    int vector_size;
+    int row, col, vector_size;
 
-    /* Get cartesian coordiantes */
-    MPI_Cart_get(comm, NDIMS, dims, periods, coords);
+    row = get_row(comm);
+    col = get_col(comm);
 
     /* Set vector_size to floor(n/q) or ceil(n/q) */
-    vector_size = block_decompose_by_dim(n, comm, COL);
+    vector_size = block_decompose_by_dim(n, comm, ROW);
 
     /* 0-th column processor */
-    if (coords[COL] == 0) {
-        int diag_coords[NDIMS];
+    if (col == 0) {
         int diag_rank;
+        int diag_coords[NDIMS];
 
         /* Populate diag_coords */
-        diag_coords[ROW] = coords[ROW];
-        diag_coords[COL] = coords[ROW];
+        diag_coords[ROW] = row;
+        diag_coords[COL] = row;
 
         /* Get the rank of the diagonal processor */
         MPI_Cart_rank(comm, diag_coords, &diag_rank);
@@ -336,12 +342,12 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
     }
 
     /* Diagonal processor */
-    if (coords[ROW] == coords[COL]) {
+    if (row == col) {
         int first_coords[NDIMS];
         int first_rank;
 
         /* Populate first_coords */
-        first_coords[ROW] = coords[ROW];
+        first_coords[ROW] = row;
         first_coords[COL] = 0;
 
         /* Get the rank of the first processor in the row */
@@ -350,6 +356,14 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
         /* Receive our part of the vector from the first processor in the row */
         MPI_Recv(row_vector, vector_size, MPI_DOUBLE, first_rank, 0, comm,
                 MPI_STATUS_IGNORE);
+
+#if 0
+        printf("In rank %d (%d,%d), (before bcast) row_vector = [", get_rank(comm), get_row(comm), get_col(comm));
+        for (int i=0; i<vector_size; i++) {
+            printf(" %lf", row_vector[i]);
+        }
+        printf("]\n");
+#endif
     }
 
     /* At this point, the diagonal column has the distributed vector in
@@ -357,18 +371,41 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
 
     MPI_Comm col_comm;
 
-    /* Create communicator for column.  We use the column in the cart
-     * communicator as our color to ensure all columns are in a unique new
-     * communicator.  Additionally, if the processor is the diagonal processor
-     * in a column, it has the key 0, while all other processors have key 1.
-     * This ensures that we can use root=0 when we broadcast */
-    MPI_Comm_split(comm, coords[COL], coords[ROW] == coords[COL] ? 0 : 1, &col_comm);
+    /* Create communicator for column */
+    int remain_dims[NDIMS];
+    remain_dims[ROW] = true;
+    remain_dims[COL] = false;
+    MPI_Cart_sub(comm, remain_dims, &col_comm);
+
+    /* Get rank of diagonal processor in column */
+    int diag_rank;
+    int diag_coords[NDIMS];
+    diag_coords[ROW] = col;
+    diag_coords[COL] = col;
+    MPI_Cart_rank(comm, diag_coords, &diag_rank);
+
+    /* Get rank for diagonal processor within col_comm */
+    int col_diag_rank;
+    MPI_Group cart_group, col_group;
+    MPI_Comm_group(comm, &cart_group);
+    MPI_Comm_group(col_comm, &col_group);
+    MPI_Group_translate_ranks(cart_group, 1, &diag_rank, col_group, &col_diag_rank);
 
     /* Broadcast into new communicator */
-    MPI_Bcast(row_vector, vector_size, MPI_DOUBLE, 0, col_comm);
+    MPI_Bcast(row_vector, vector_size, MPI_DOUBLE, col_diag_rank, col_comm);
+
+#if 0
+    printf("In rank %d (%d,%d), (after bcast) row_vector = [", get_rank(comm), get_row(comm), get_col(comm));
+    for (int i=0; i<vector_size; i++) {
+        printf(" %lf", row_vector[i]);
+    }
+    printf("]\n");
+#endif
 
     /* Cleanup */
     MPI_Comm_free(&col_comm);
+    MPI_Group_free(&cart_group);
+    MPI_Group_free(&col_group);
 }
 
 /*
@@ -401,12 +438,22 @@ void distributed_matrix_vector_mult(const int n, double* local_A, double* local_
         partial_res[row] = 0.0;
     }
 
+
     /* Calculate y = A*x, row-by-row */
     for (int row=0; row<num_rows; row++) {
         for (int col=0; col<num_cols; col++) {
             partial_res[row] += local_A[row * num_cols + col] * transposed_x[col];
         }
     }
+
+#if 0
+    printf("In rank %d (%d,%d), partial_res = [\n", get_rank(comm), get_row(comm), get_col(comm));
+    for (int i=0; i<num_rows; i++) {
+        printf(" %lf\n", partial_res[i]);
+    }
+    printf("]\n");
+
+#endif
 
     /* Create communicator for current row */
     int remain_dims[NDIMS];
