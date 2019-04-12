@@ -493,7 +493,7 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
 		}
 		else {
 			for (int i=0; i < rows; i++) {
-				diagonal[i] = local_A[i * rows + 1];
+				diagonal[i] = local_A[i * rows + i];
 			}
 		}
 		
