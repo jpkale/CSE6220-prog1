@@ -20,6 +20,7 @@
 /*
  * TODO: Implement your solutions here
  */
+#include <iostream>
 
  /*
  * @param n             The size of the input vector.
@@ -313,8 +314,9 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
     /* Set vector_size to floor(n/q) or ceil(n/q) */
     vector_size = block_decompose_by_dim(n, comm, ROW);
 
+
     /* 0-th column processor */
-    if (col == 0) {
+    if (col == 0 && row != 0) {
         int diag_rank;
         int diag_coords[NDIMS];
 
@@ -330,7 +332,7 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
     }
 
     /* Diagonal processor */
-    if (row == col) {
+    if (row == col && row != 0) {
         int first_coords[NDIMS];
         int first_rank;
 
