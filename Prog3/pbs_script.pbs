@@ -1,0 +1,16 @@
+#!/bin/sh
+
+#PBS -q coc-ice-multi
+#PBS -l nodes=2:ppn=8
+#PBS -l walltime=00:10:00
+#PBS -N PA3
+#PBS -o $PBS_JOBID.out
+#PBS -e $PBS_JOBID.err
+#PBS -m abe
+#PBS -M cbaumann7@gatech.edu
+
+# change to our project directory
+cd $PBS_O_WORKDIR
+module load gcc mvapich2/2.2
+make all
+mpirun -np 64 ./jacobi -n 10000 -d 0.5
