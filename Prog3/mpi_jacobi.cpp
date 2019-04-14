@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <math.h>
 #include <vector>
+#include <iostream>
 
 /*
  * TODO: Implement your solutions here
@@ -92,8 +93,8 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
 	MPI_Group_free(&cartesianGroup);
 	MPI_Group_free(&columnGroup);
 	MPI_Comm_free(&colComm);
-	delete count;
-	delete displs;
+	delete[] count;
+	delete[] displs;
 	return;
 
 }
@@ -111,7 +112,7 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
 {
 	int rank = 0;
 	int coordinates[NDIMS];
-	
+
 	//Get rank and coordinates
 	MPI_Comm_rank(comm, &rank);
 	MPI_Cart_coords(comm, rank, NDIMS, coordinates);
@@ -242,8 +243,8 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
 		MPI_Group_translate_ranks(groupCart, 1, &cart_root_rank, groupCol, &commRootRank);
 		MPI_Scatterv(input_matrix, count, displs, MPI_DOUBLE, temp, size, MPI_DOUBLE, commRootRank, colComm);
 		
-		delete count;
-		delete displs;
+		delete[] count;
+		delete[] displs;
 	}
 
 	MPI_Barrier(comm);
@@ -280,9 +281,9 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
 	}
 
     /* Clean-up */
-	delete count;
-	delete displs;
-	delete temp;
+	delete[] count;
+	delete[] displs;
+	delete[] temp;
 	MPI_Comm_free(&rowComm);
 	MPI_Comm_free(&colComm);
 	MPI_Group_free(&groupCart);
