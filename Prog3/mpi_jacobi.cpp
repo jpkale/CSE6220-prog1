@@ -315,37 +315,41 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
     vector_size = block_decompose_by_dim(n, comm, ROW);
 
 
-    /* 0-th column processor */
-    if (col == 0 && row != 0) {
-        int diag_rank;
-        int diag_coords[NDIMS];
+    if (row != 0) {
+        /* 0-th column processor */
+        if (col == 0) {
+            int diag_rank;
+            int diag_coords[NDIMS];
 
-        /* Populate diag_coords */
-        diag_coords[ROW] = row;
-        diag_coords[COL] = row;
+            /* Populate diag_coords */
+            diag_coords[ROW] = row;
+            diag_coords[COL] = row;
 
-        /* Get the rank of the diagonal processor */
-        MPI_Cart_rank(comm, diag_coords, &diag_rank);
+            /* Get the rank of the diagonal processor */
+            MPI_Cart_rank(comm, diag_coords, &diag_rank);
 
-        /* Send our part of the vector to the diagonal processor */
-        MPI_Send(col_vector, vector_size, MPI_DOUBLE, diag_rank, 0, comm);
-    }
+            /* Send our part of the vector to the diagonal processor */
+            MPI_Send(col_vector, vector_size, MPI_DOUBLE, diag_rank, 0, comm);
+        }
 
-    /* Diagonal processor */
-    if (row == col && row != 0) {
-        int first_coords[NDIMS];
-        int first_rank;
+        /* Diagonal processor */
+        if (row == col) {
+            int first_coords[NDIMS];
+            int first_rank;
 
-        /* Populate first_coords */
-        first_coords[ROW] = row;
-        first_coords[COL] = 0;
+            /* Populate first_coords */
+            first_coords[ROW] = row;
+            first_coords[COL] = 0;
 
-        /* Get the rank of the first processor in the row */
-        MPI_Cart_rank(comm, first_coords, &first_rank);
+            /* Get the rank of the first processor in the row */
+            MPI_Cart_rank(comm, first_coords, &first_rank);
 
-        /* Receive our part of the vector from the first processor in the row */
-        MPI_Recv(row_vector, vector_size, MPI_DOUBLE, first_rank, 0, comm,
-                MPI_STATUS_IGNORE);
+            /* Receive our part of the vector from the first processor in the row */
+            MPI_Recv(row_vector, vector_size, MPI_DOUBLE, first_rank, 0, comm,
+                    MPI_STATUS_IGNORE);
+        }
+    } else if (col == 0) {
+        memcpy(row_vector, col_vector, vector_size * sizeof(double));
     }
 
     /* At this point, the diagonal column has the distributed vector in
