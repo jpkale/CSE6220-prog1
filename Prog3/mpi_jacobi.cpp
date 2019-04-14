@@ -21,6 +21,7 @@
  * TODO: Implement your solutions here
  */
 #include <iostream>
+#include <string.h>
 
  /*
  * @param n             The size of the input vector.
