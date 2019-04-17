@@ -23,6 +23,8 @@
 #include <iostream>
 #include <string.h>
 
+#define DEBUG false
+
  /*
  * @param n             The size of the input vector.
  * @param input_vector  The input vector of length `n`, only on processor (0,0).
@@ -553,7 +555,8 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
 		
 		if (iterations < max_iter) {
 			if (residual < l2_termination) {
-				std::cout<<"Iteration meets L2 termination condition"<<std::endl;
+				if (DEBUG)
+					std::cout<<"Iteration meets L2 termination condition"<<std::endl;
 				break;
 			}
 			else {
@@ -566,11 +569,13 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
 			}
 		}
 		else if(residual < l2_termination) {
-			std::cout<<"Iteration meets L2 termination condition"<<std::endl;
+			if (DEBUG)
+				std::cout<<"Iteration meets L2 termination condition"<<std::endl;
 			break;
 		}
 		else {
-			std::cout<<"Reached max_iter without converging"<<std::endl;
+			if (DEBUG)
+				std::cout<<"Reached max_iter without converging"<<std::endl;
 			break;
 		}
 	}
