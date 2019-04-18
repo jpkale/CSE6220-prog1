@@ -51,8 +51,6 @@ inline int block_decompose_by_dim(const int n, MPI_Comm comm, int dim)
 #define COL 1
 #define NDIMS 2
 
-/* TODO: Move the all to cpp file, memoize */
-
 /* Get the current row in a cartesian communicator */
 int get_row(MPI_Comm comm);
 
