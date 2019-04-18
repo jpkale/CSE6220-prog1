@@ -39,61 +39,61 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
 {
     int row = get_row(comm);
     int col = get_col(comm);
-	
-	//Create Column Communicator subset group for scattering vector
-	MPI_Comm colComm;
-	int remain_dims[NDIMS];
+
+    //Create Column Communicator subset group for scattering vector
+    MPI_Comm colComm;
+    int remain_dims[NDIMS];
     remain_dims[ROW] = true;
     remain_dims[COL] = false;
-	MPI_Cart_sub(comm, remain_dims, &colComm);
-	
-	// Create communication groups
-	MPI_Group cartesianGroup, columnGroup;
-	MPI_Comm_group(comm, &cartesianGroup);
-	MPI_Comm_group(colComm, &columnGroup);
-	
-	//If not in the first column of processor grid, do nothing
-	if (col != 0)
-	{
-		MPI_Group_free(&cartesianGroup);
-		MPI_Group_free(&columnGroup);
-		MPI_Comm_free(&colComm);
-		return;
-	}
-	
-	//Calculate num of elements for each processor
-    int num_rows = get_num_rows(comm);
-	
-	int* count = new int[num_rows];
-	count[0] = block_decompose(n,num_rows,0);
-	
-	int* displs = new int[num_rows];
-	displs[0] = 0;
-	
-	for (int i=1; i < num_rows; i++) {
-		count[i] = block_decompose(n,num_rows,i);
-		displs[i] = displs[i-1] + count[i-1];
-	}
-	
-	//Get root rank and coordinates
-	int rankRoot;
-	int coordRoot[] = {0,0};
-	MPI_Cart_rank(comm, coordRoot, &rankRoot);
+    MPI_Cart_sub(comm, remain_dims, &colComm);
 
-	//Scatter
-	int size = block_decompose(n, num_rows, row);
-	(*local_vector) = new double[size];
-	int translationRank;
-	MPI_Group_translate_ranks(cartesianGroup, 1, &rankRoot, columnGroup, &translationRank);
+    // Create communication groups
+    MPI_Group cartesianGroup, columnGroup;
+    MPI_Comm_group(comm, &cartesianGroup);
+    MPI_Comm_group(colComm, &columnGroup);
+
+    //If not in the first column of processor grid, do nothing
+    if (col != 0)
+    {
+        MPI_Group_free(&cartesianGroup);
+        MPI_Group_free(&columnGroup);
+        MPI_Comm_free(&colComm);
+        return;
+    }
+
+    //Calculate num of elements for each processor
+    int num_rows = get_num_rows(comm);
+
+    int* count = new int[num_rows];
+    count[0] = block_decompose(n,num_rows,0);
+
+    int* displs = new int[num_rows];
+    displs[0] = 0;
+
+    for (int i=1; i < num_rows; i++) {
+        count[i] = block_decompose(n,num_rows,i);
+        displs[i] = displs[i-1] + count[i-1];
+    }
+
+    //Get root rank and coordinates
+    int rankRoot;
+    int coordRoot[] = {0,0};
+    MPI_Cart_rank(comm, coordRoot, &rankRoot);
+
+    //Scatter
+    int size = block_decompose(n, num_rows, row);
+    (*local_vector) = new double[size];
+    int translationRank;
+    MPI_Group_translate_ranks(cartesianGroup, 1, &rankRoot, columnGroup, &translationRank);
     MPI_Scatterv(input_vector, count, displs, MPI_DOUBLE, *local_vector, size, MPI_DOUBLE, translationRank, colComm);
 
 
-	MPI_Group_free(&cartesianGroup);
-	MPI_Group_free(&columnGroup);
-	MPI_Comm_free(&colComm);
-	delete count;
-	delete displs;
-	return;
+    MPI_Group_free(&cartesianGroup);
+    MPI_Group_free(&columnGroup);
+    MPI_Comm_free(&colComm);
+    delete count;
+    delete displs;
+    return;
 
 }
 
@@ -108,65 +108,65 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
 // gather the local vector distributed among (i,0) to the processor (0,0)
 void gather_vector(const int n, double* local_vector, double* output_vector, MPI_Comm comm)
 {
-	//Get rank and coordinates
+    //Get rank and coordinates
     int rank = get_rank(comm);
     int row = get_row(comm);
     int col = get_col(comm);
-	
-	//Create Column Communicator subset group for scattering vector
-	MPI_Comm colComm;
-	int remain_dims[NDIMS];
+
+    //Create Column Communicator subset group for scattering vector
+    MPI_Comm colComm;
+    int remain_dims[NDIMS];
     remain_dims[ROW] = true;
     remain_dims[COL] = false;
-	MPI_Cart_sub(comm, remain_dims, &colComm);
-	
-	MPI_Group cartesianGroup, columnGroup;
-	MPI_Comm_group(comm, &cartesianGroup);
-	MPI_Comm_group(comm, &columnGroup);
-	
-	//If not in the first column of processor grid, do nothing
-	if (col != 0)
-	{
-		MPI_Group_free(&cartesianGroup);
-		MPI_Group_free(&columnGroup);
-		MPI_Comm_free(&colComm);
-		return;
-	}
-	
-	//Calculate num of elements for each processor
+    MPI_Cart_sub(comm, remain_dims, &colComm);
+
+    MPI_Group cartesianGroup, columnGroup;
+    MPI_Comm_group(comm, &cartesianGroup);
+    MPI_Comm_group(comm, &columnGroup);
+
+    //If not in the first column of processor grid, do nothing
+    if (col != 0)
+    {
+        MPI_Group_free(&cartesianGroup);
+        MPI_Group_free(&columnGroup);
+        MPI_Comm_free(&colComm);
+        return;
+    }
+
+    //Calculate num of elements for each processor
     int num_rows = get_num_rows(comm);
-	
-	int* count = NULL;
-	int* displs = NULL;
-	
-	//Get root rank and coordinates
-	int rankRoot;
-	int coordRoot[] = {0,0};
-	MPI_Cart_rank(comm, coordRoot, &rankRoot);
-	
-	if (rank == rankRoot) {
-		count = new int[num_rows];
-		displs = new int[num_rows];
-		count[0] = block_decompose(n, num_rows, 0);
-		displs[0] = 0;
-		
-		for (int i=0; i < num_rows; i++) {
-			count[i] = block_decompose(n,num_rows,i);
-			displs[i] = displs[i-1] + count[i-1];
-		}
-	}
-	
-	//Gather
-	int size = block_decompose(n,num_rows, row);
-	int translationRank;
-	MPI_Group_translate_ranks(cartesianGroup, 1, &rankRoot, columnGroup, &translationRank);
-	MPI_Gatherv(local_vector, size, MPI_DOUBLE, output_vector, count, displs, MPI_DOUBLE, translationRank, colComm);
-	
-	MPI_Group_free(&cartesianGroup);
-	MPI_Group_free(&columnGroup);
-	MPI_Comm_free(&colComm);
-	delete count;
-	delete displs;
+
+    int* count = NULL;
+    int* displs = NULL;
+
+    //Get root rank and coordinates
+    int rankRoot;
+    int coordRoot[] = {0,0};
+    MPI_Cart_rank(comm, coordRoot, &rankRoot);
+
+    if (rank == rankRoot) {
+        count = new int[num_rows];
+        displs = new int[num_rows];
+        count[0] = block_decompose(n, num_rows, 0);
+        displs[0] = 0;
+
+        for (int i=0; i < num_rows; i++) {
+            count[i] = block_decompose(n,num_rows,i);
+            displs[i] = displs[i-1] + count[i-1];
+        }
+    }
+
+    //Gather
+    int size = block_decompose(n,num_rows, row);
+    int translationRank;
+    MPI_Group_translate_ranks(cartesianGroup, 1, &rankRoot, columnGroup, &translationRank);
+    MPI_Gatherv(local_vector, size, MPI_DOUBLE, output_vector, count, displs, MPI_DOUBLE, translationRank, colComm);
+
+    MPI_Group_free(&cartesianGroup);
+    MPI_Group_free(&columnGroup);
+    MPI_Comm_free(&colComm);
+    delete count;
+    delete displs;
 }
 
 /*
@@ -196,92 +196,92 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
     cart_comm_rows = get_num_rows(comm);
 
     /* Create a communicator for the current column */
-	MPI_Comm colComm;
-	int remain_dims[NDIMS];
+    MPI_Comm colComm;
+    int remain_dims[NDIMS];
     remain_dims[ROW] = true;
     remain_dims[COL] = false;
-	MPI_Cart_sub(comm, remain_dims, &colComm);
+    MPI_Cart_sub(comm, remain_dims, &colComm);
 
     /* Create a communicator for the current row */
-	MPI_Comm rowComm;
-	remain_dims[ROW] = false;
-	remain_dims[COL] = true;
-	MPI_Cart_sub(comm, remain_dims, &rowComm);
+    MPI_Comm rowComm;
+    remain_dims[ROW] = false;
+    remain_dims[COL] = true;
+    MPI_Cart_sub(comm, remain_dims, &rowComm);
 
     /* Get the groups for the current column, row, and cartesian communicators
      * for easy conversion between ranks later */
-	MPI_Group groupCart, groupCol, groupRow;
-	MPI_Comm_group(comm, &groupCart);
-	MPI_Comm_group(colComm, &groupCol);
-	MPI_Comm_group(rowComm, &groupRow);
+    MPI_Group groupCart, groupCol, groupRow;
+    MPI_Comm_group(comm, &groupCart);
+    MPI_Comm_group(colComm, &groupCol);
+    MPI_Comm_group(rowComm, &groupRow);
 
     /* Distribute matrix among processors in first column */
-	double* temp = NULL;
-	if (col == 0) {
-		int* count = new int[cart_comm_cols];
-		int* displs = new int[cart_comm_cols];
-		
-		displs[0] = 0;
-		count[0] = n * block_decompose(n, cart_comm_cols, 0);
-		
-		for (int i=1; i < cart_comm_cols; i++) {
-			count[i] = n * block_decompose(n, cart_comm_cols, i);
-			displs[i] = displs[i-1] + count[i-1];
-		}
-	
+    double* temp = NULL;
+    if (col == 0) {
+        int* count = new int[cart_comm_cols];
+        int* displs = new int[cart_comm_cols];
+
+        displs[0] = 0;
+        count[0] = n * block_decompose(n, cart_comm_cols, 0);
+
+        for (int i=1; i < cart_comm_cols; i++) {
+            count[i] = n * block_decompose(n, cart_comm_cols, i);
+            displs[i] = displs[i-1] + count[i-1];
+        }
+
         int size = n * block_decompose(n, cart_comm_cols, col);
-		temp = new double[size];
+        temp = new double[size];
 
-		int commRootRank;
-		MPI_Group_translate_ranks(groupCart, 1, &cart_root_rank, groupCol, &commRootRank);
-		MPI_Scatterv(input_matrix, count, displs, MPI_DOUBLE, temp, size, MPI_DOUBLE, commRootRank, colComm);
-		
-		delete count;
-		delete displs;
-	}
+        int commRootRank;
+        MPI_Group_translate_ranks(groupCart, 1, &cart_root_rank, groupCol, &commRootRank);
+        MPI_Scatterv(input_matrix, count, displs, MPI_DOUBLE, temp, size, MPI_DOUBLE, commRootRank, colComm);
 
-	MPI_Barrier(comm);
-	
-	int rows = block_decompose(n, cart_comm_rows, row);
-	int columns = block_decompose(n, cart_comm_cols, col);
-	(*local_matrix) = new double[rows*columns];
-	
-	int rankColRoot;
-	int coordinatesColRoot[NDIMS];
+        delete count;
+        delete displs;
+    }
+
+    MPI_Barrier(comm);
+
+    int rows = block_decompose(n, cart_comm_rows, row);
+    int columns = block_decompose(n, cart_comm_cols, col);
+    (*local_matrix) = new double[rows*columns];
+
+    int rankColRoot;
+    int coordinatesColRoot[NDIMS];
     coordinatesColRoot[ROW] = row;
     coordinatesColRoot[COL] = 0;
-	MPI_Cart_rank(comm, coordinatesColRoot,&rankColRoot);
-	
-	int* count = new int[cart_comm_rows];
-	int* displs = new int[cart_comm_rows];
-	displs[0] = 0;
-	count[0] = block_decompose(n, cart_comm_rows, 0);
-	
-	for(int i=1; i < cart_comm_rows; i++) {
-		count[i] = block_decompose(n, cart_comm_rows, i);
-		displs[i] = displs[i-1] + count [i-1];
-	}
-	
-	int commRankRowRoot;
-	MPI_Group_translate_ranks(groupCart, 1, &rankColRoot, groupRow, &commRankRowRoot);
+    MPI_Cart_rank(comm, coordinatesColRoot,&rankColRoot);
+
+    int* count = new int[cart_comm_rows];
+    int* displs = new int[cart_comm_rows];
+    displs[0] = 0;
+    count[0] = block_decompose(n, cart_comm_rows, 0);
+
+    for(int i=1; i < cart_comm_rows; i++) {
+        count[i] = block_decompose(n, cart_comm_rows, i);
+        displs[i] = displs[i-1] + count [i-1];
+    }
+
+    int commRankRowRoot;
+    MPI_Group_translate_ranks(groupCart, 1, &rankColRoot, groupRow, &commRankRowRoot);
 
     /* Distribute matrix from processors in first column to all processors in
      * the same row */
-	for (int i=0; i < rows; i++) {
-		MPI_Scatterv((temp + i*n), count, displs, MPI_DOUBLE,
+    for (int i=0; i < rows; i++) {
+        MPI_Scatterv((temp + i*n), count, displs, MPI_DOUBLE,
                      (*local_matrix + i*columns), columns, MPI_DOUBLE,
                      commRankRowRoot, rowComm);
-	}
+    }
 
     /* Clean-up */
-	delete count;
-	delete displs;
-	delete temp;
-	MPI_Comm_free(&rowComm);
-	MPI_Comm_free(&colComm);
-	MPI_Group_free(&groupCart);
-	MPI_Group_free(&groupRow);
-	MPI_Group_free(&groupCol);
+    delete count;
+    delete displs;
+    delete temp;
+    MPI_Comm_free(&rowComm);
+    MPI_Comm_free(&colComm);
+    MPI_Group_free(&groupCart);
+    MPI_Group_free(&groupRow);
+    MPI_Group_free(&groupCol);
 }
 
 /*
@@ -460,115 +460,115 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
     int rank = get_rank(comm);
     int row = get_row(comm);
     int col = get_col(comm);
-	
+
     int num_rows = get_num_rows(comm);
-	
-	int rankRoot;	
-	int rankRowRoot;
-	int rankRootDiag;
-	int coordsRoot[2] = {0,0};
-	int coordsRowRoot[2] = {row, 0};
-	int coordsRootDiag[2] = {row, row};
-	MPI_Cart_rank(comm, coordsRoot, &rankRoot);
-	MPI_Cart_rank(comm, coordsRowRoot, &rankRowRoot);
-	MPI_Cart_rank(comm, coordsRootDiag, &rankRootDiag);
-	
-	int rows = block_decompose(n, num_rows, row);
-	
-	double* diagonal = NULL;
-	if(col == 0) {
-		diagonal = new double[rows];
-		
-		if (rank != rankRootDiag) {
-			for(int i=0; i < rows; i++) {
-				MPI_Recv(diagonal + i, 1, MPI_DOUBLE, rankRootDiag, MPI_ANY_TAG, comm, MPI_STATUS_IGNORE);
-			}
-		}
-		else {
-			for (int i=0; i < rows; i++) {
-				diagonal[i] = local_A[i * rows + i];
-			}
-		}
-		
-		for (int i = 0; i < rows; i++) { 
-			local_x[i] = 0;
-		}
-	}
-	else if (rank == rankRootDiag) {
-		for (int i = 0; i < rows; i++) {
-			MPI_Send((local_A + i * rows + i), 1, MPI_DOUBLE, rankRowRoot, 1, comm);
-		}
-	}
-	
-	double* resultAx = NULL;
-	if (col == 0) {
-		resultAx = new double[rows];
-	}
-	
-	MPI_Comm colComm;
-	int remain_dims[2] = {true, false};
-	MPI_Cart_sub(comm, remain_dims, &colComm);
-	
-	MPI_Group groupCart, groupCol;
-	MPI_Comm_group(comm, &groupCart);
-	MPI_Comm_group(colComm, &groupCol);
-	
-	int rankCommRoot;
-	MPI_Group_translate_ranks(groupCart, 1, &rankRoot, groupCol, &rankCommRoot);
-	
-	double resultLocal;
-	double residual;
-	int iterations = 0;
-	
-	while(1) {
-		distributed_matrix_vector_mult(n, local_A, local_x, resultAx, comm);
-		
-		if (col == 0) {
-			resultLocal = 0;
-			for(int i = 0; i < rows; i++) {
-				resultLocal = resultLocal + (resultAx[i] - local_b[i]) * (resultAx[i] - local_b[i]);
-			}
-			MPI_Reduce(&resultLocal, &residual, 1, MPI_DOUBLE, MPI_SUM, rankCommRoot, colComm);
-		}
-		
-		if (rank == rankRoot) {
-			residual = sqrt(residual);
-		}
-		
-		MPI_Bcast(&residual, 1, MPI_DOUBLE, rankRoot, comm);
-		
-		if (iterations < max_iter) {
-			if (residual < l2_termination) {
-				if (DEBUG)
-					std::cout<<"Iteration meets L2 termination condition"<<std::endl;
-				break;
-			}
-			else {
-				if (col == 0) {
-					for (int i=0; i < rows; i++) {
-						local_x[i] = (local_b[i] - resultAx[i] + diagonal[i]*local_x[i]) / diagonal[i];
-					}
-				}
-				iterations++;
-			}
-		}
-		else if(residual < l2_termination) {
-			if (DEBUG)
-				std::cout<<"Iteration meets L2 termination condition"<<std::endl;
-			break;
-		}
-		else {
-			if (DEBUG)
-				std::cout<<"Reached max_iter without converging"<<std::endl;
-			break;
-		}
-	}
-	
-	delete resultAx;
-	delete diagonal;
-	MPI_Comm_free(&colComm);
-	MPI_Group_free(&groupCart);
-	MPI_Group_free(&groupCol);
+
+    int rankRoot;
+    int rankRowRoot;
+    int rankRootDiag;
+    int coordsRoot[2] = {0,0};
+    int coordsRowRoot[2] = {row, 0};
+    int coordsRootDiag[2] = {row, row};
+    MPI_Cart_rank(comm, coordsRoot, &rankRoot);
+    MPI_Cart_rank(comm, coordsRowRoot, &rankRowRoot);
+    MPI_Cart_rank(comm, coordsRootDiag, &rankRootDiag);
+
+    int rows = block_decompose(n, num_rows, row);
+
+    double* diagonal = NULL;
+    if(col == 0) {
+        diagonal = new double[rows];
+
+        if (rank != rankRootDiag) {
+            for(int i=0; i < rows; i++) {
+                MPI_Recv(diagonal + i, 1, MPI_DOUBLE, rankRootDiag, MPI_ANY_TAG, comm, MPI_STATUS_IGNORE);
+            }
+        }
+        else {
+            for (int i=0; i < rows; i++) {
+                diagonal[i] = local_A[i * rows + i];
+            }
+        }
+
+        for (int i = 0; i < rows; i++) {
+            local_x[i] = 0;
+        }
+    }
+    else if (rank == rankRootDiag) {
+        for (int i = 0; i < rows; i++) {
+            MPI_Send((local_A + i * rows + i), 1, MPI_DOUBLE, rankRowRoot, 1, comm);
+        }
+    }
+
+    double* resultAx = NULL;
+    if (col == 0) {
+        resultAx = new double[rows];
+    }
+
+    MPI_Comm colComm;
+    int remain_dims[2] = {true, false};
+    MPI_Cart_sub(comm, remain_dims, &colComm);
+
+    MPI_Group groupCart, groupCol;
+    MPI_Comm_group(comm, &groupCart);
+    MPI_Comm_group(colComm, &groupCol);
+
+    int rankCommRoot;
+    MPI_Group_translate_ranks(groupCart, 1, &rankRoot, groupCol, &rankCommRoot);
+
+    double resultLocal;
+    double residual;
+    int iterations = 0;
+
+    while(1) {
+        distributed_matrix_vector_mult(n, local_A, local_x, resultAx, comm);
+
+        if (col == 0) {
+            resultLocal = 0;
+            for(int i = 0; i < rows; i++) {
+                resultLocal = resultLocal + (resultAx[i] - local_b[i]) * (resultAx[i] - local_b[i]);
+            }
+            MPI_Reduce(&resultLocal, &residual, 1, MPI_DOUBLE, MPI_SUM, rankCommRoot, colComm);
+        }
+
+        if (rank == rankRoot) {
+            residual = sqrt(residual);
+        }
+
+        MPI_Bcast(&residual, 1, MPI_DOUBLE, rankRoot, comm);
+
+        if (iterations < max_iter) {
+            if (residual < l2_termination) {
+                if (DEBUG)
+                    std::cout<<"Iteration meets L2 termination condition"<<std::endl;
+                break;
+            }
+            else {
+                if (col == 0) {
+                    for (int i=0; i < rows; i++) {
+                        local_x[i] = (local_b[i] - resultAx[i] + diagonal[i]*local_x[i]) / diagonal[i];
+                    }
+                }
+                iterations++;
+            }
+        }
+        else if(residual < l2_termination) {
+            if (DEBUG)
+                std::cout<<"Iteration meets L2 termination condition"<<std::endl;
+            break;
+        }
+        else {
+            if (DEBUG)
+                std::cout<<"Reached max_iter without converging"<<std::endl;
+            break;
+        }
+    }
+
+    delete resultAx;
+    delete diagonal;
+    MPI_Comm_free(&colComm);
+    MPI_Group_free(&groupCart);
+    MPI_Group_free(&groupCol);
 }
 
 /*
