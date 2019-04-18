@@ -485,9 +485,7 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
         resultAx = new double[rows];
     }
 
-    MPI_Comm colComm;
-    int remain_dims[2] = {true, false};
-    MPI_Cart_sub(comm, remain_dims, &colComm);
+    MPI_Comm colComm = create_col_comm(comm);
 
     MPI_Group groupCart, groupCol;
     MPI_Comm_group(comm, &groupCart);
