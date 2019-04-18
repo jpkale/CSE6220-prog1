@@ -85,3 +85,30 @@ int get_cart_rank(MPI_Comm comm, int row, int col)
 
     return rank;
 }
+
+static int translate_cart_to_1d_rank(MPI_Comm cart_comm, MPI_Comm oned_comm, int cart_rank)
+{
+    MPI_Group cart_group, oned_group;
+    int oned_rank;
+
+    MPI_Comm_group(cart_comm, &cart_group);
+    MPI_Comm_group(oned_comm, &oned_group);
+
+    MPI_Group_translate_ranks(cart_group, 1, &cart_rank, oned_group, &oned_rank);
+
+    MPI_Group_free(&cart_group);
+    MPI_Group_free(&oned_group);
+
+    return oned_rank;
+}
+
+int translate_cart_to_col_rank(MPI_Comm cart_comm, MPI_Comm col_comm, int cart_rank)
+{
+    return translate_cart_to_1d_rank(cart_comm, col_comm, cart_rank);
+}
+
+int translate_cart_to_row_rank(MPI_Comm cart_comm, MPI_Comm row_comm, int cart_rank)
+{
+    return translate_cart_to_1d_rank(cart_comm, row_comm, cart_rank);
+}
+

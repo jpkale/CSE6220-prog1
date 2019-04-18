@@ -80,4 +80,12 @@ MPI_Comm create_row_comm(MPI_Comm comm);
  * position (row,col) */
 int get_cart_rank(MPI_Comm comm, int row, int col);
 
+/* Translate the cartesian rank of a processor to the column rank, given a
+ * cartesian and column communicator */
+int translate_cart_to_col_rank(MPI_Comm cart_comm, MPI_Comm col_comm, int cart_rank);
+
+/* Translate the cartesian rank of a processor to the row rank, given a
+ * cartesian and row communicator */
+int translate_cart_to_row_rank(MPI_Comm cart_comm, MPI_Comm row_comm, int cart_rank);
+
 #endif // UTILS_H
