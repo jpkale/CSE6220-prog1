@@ -33,15 +33,6 @@ int get_rank(MPI_Comm comm)
     return rank;
 }
 
-int get_cart_root_rank(MPI_Comm comm)
-{
-    int rank, coords[NDIMS];
-    coords[0] = 0;
-    coords[1] = 0;
-    MPI_Cart_rank(comm, coords, &rank);
-    return rank;
-}
-
 int get_num_rows(MPI_Comm comm)
 {
     int dims[NDIMS], period[NDIMS], coords[NDIMS];
@@ -81,5 +72,16 @@ MPI_Comm create_col_comm(MPI_Comm comm)
 MPI_Comm create_row_comm(MPI_Comm comm)
 {
     return create_comm_by_dim(comm, ROW);
+}
 
+int get_cart_rank(MPI_Comm comm, int row, int col)
+{
+    int coords[NDIMS];
+    int rank;
+
+    coords[ROW] = row;
+    coords[COL] = col;
+    MPI_Cart_rank(comm, coords, &rank);
+
+    return rank;
 }

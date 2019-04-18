@@ -72,15 +72,13 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
     }
 
     //Get root rank and coordinates
-    int rankRoot;
-    int coordRoot[] = {0,0};
-    MPI_Cart_rank(comm, coordRoot, &rankRoot);
+    int rank_root = get_cart_rank(comm, 0, 0);
 
     //Scatter
     int size = block_decompose(n, num_rows, row);
     (*local_vector) = new double[size];
     int translationRank;
-    MPI_Group_translate_ranks(cartesianGroup, 1, &rankRoot, columnGroup, &translationRank);
+    MPI_Group_translate_ranks(cartesianGroup, 1, &rank_root, columnGroup, &translationRank);
     MPI_Scatterv(input_vector, count, displs, MPI_DOUBLE, *local_vector, size,
                  MPI_DOUBLE, translationRank, col_comm);
 
@@ -133,11 +131,9 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
     int* displs = NULL;
 
     //Get root rank and coordinates
-    int rankRoot;
-    int coordRoot[] = {0,0};
-    MPI_Cart_rank(comm, coordRoot, &rankRoot);
+    int rank_root = get_cart_rank(comm, 0, 0);
 
-    if (rank == rankRoot) {
+    if (rank == rank_root) {
         count = new int[num_rows];
         displs = new int[num_rows];
         count[0] = block_decompose(n, num_rows, 0);
@@ -152,7 +148,7 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
     //Gather
     int size = block_decompose(n,num_rows, row);
     int translationRank;
-    MPI_Group_translate_ranks(cartesianGroup, 1, &rankRoot, columnGroup, &translationRank);
+    MPI_Group_translate_ranks(cartesianGroup, 1, &rank_root, columnGroup, &translationRank);
     MPI_Gatherv(local_vector, size, MPI_DOUBLE, output_vector, count, displs,
                 MPI_DOUBLE, translationRank, col_comm);
 
@@ -176,18 +172,15 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
  */
 void distribute_matrix(const int n, double* input_matrix, double** local_matrix, MPI_Comm comm)
 {
-    int row, col, cart_root_rank;
-
     /* Get our rank, row, column, and the cart-group's root's rank */
-    row = get_row(comm);
-    col = get_col(comm);
-    cart_root_rank = get_cart_root_rank(comm);
+    int row = get_row(comm);
+    int col = get_col(comm);
+    int cart_root_rank = get_cart_rank(comm, 0, 0);
 
     /* Get the total number of rows and columns in the cartesian group.  They
      * should be the same, but we get both just to be sure */
-    int cart_comm_rows, cart_comm_cols;
-    cart_comm_cols = get_num_cols(comm);
-    cart_comm_rows = get_num_rows(comm);
+    int cart_comm_cols = get_num_cols(comm);
+    int cart_comm_rows = get_num_rows(comm);
 
     /* Create a communicator for the current column */
     MPI_Comm col_comm = create_col_comm(comm);
@@ -234,11 +227,7 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
     int columns = block_decompose(n, cart_comm_cols, col);
     (*local_matrix) = new double[rows*columns];
 
-    int rankColRoot;
-    int coordinatesColRoot[NDIMS];
-    coordinatesColRoot[ROW] = row;
-    coordinatesColRoot[COL] = 0;
-    MPI_Cart_rank(comm, coordinatesColRoot,&rankColRoot);
+    int rank_col_root = get_cart_rank(comm, row, 0);
 
     int* count = new int[cart_comm_rows];
     int* displs = new int[cart_comm_rows];
@@ -251,7 +240,7 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
     }
 
     int commRankRowRoot;
-    MPI_Group_translate_ranks(groupCart, 1, &rankColRoot, groupRow, &commRankRowRoot);
+    MPI_Group_translate_ranks(groupCart, 1, &rank_col_root, groupRow, &commRankRowRoot);
 
     /* Distribute matrix from processors in first column to all processors in
      * the same row */
@@ -297,15 +286,8 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
     if (row != 0) {
         /* 0-th column processor */
         if (col == 0) {
-            int diag_rank;
-            int diag_coords[NDIMS];
-
-            /* Populate diag_coords */
-            diag_coords[ROW] = row;
-            diag_coords[COL] = row;
-
             /* Get the rank of the diagonal processor */
-            MPI_Cart_rank(comm, diag_coords, &diag_rank);
+            int diag_rank = get_cart_rank(comm, row, row);
 
             /* Send our part of the vector to the diagonal processor */
             MPI_Send(col_vector, vector_size, MPI_DOUBLE, diag_rank, 0, comm);
@@ -313,15 +295,8 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
 
         /* Diagonal processor */
         if (row == col) {
-            int first_coords[NDIMS];
-            int first_rank;
-
-            /* Populate first_coords */
-            first_coords[ROW] = row;
-            first_coords[COL] = 0;
-
             /* Get the rank of the first processor in the row */
-            MPI_Cart_rank(comm, first_coords, &first_rank);
+            int first_rank = get_cart_rank(comm, row, 0);
 
             /* Receive our part of the vector from the first processor in the row */
             MPI_Recv(row_vector, vector_size, MPI_DOUBLE, first_rank, 0, comm,
@@ -339,11 +314,7 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
     MPI_Comm col_comm = create_col_comm(comm);
 
     /* Get rank of diagonal processor in column */
-    int diag_rank;
-    int diag_coords[NDIMS];
-    diag_coords[ROW] = col;
-    diag_coords[COL] = col;
-    MPI_Cart_rank(comm, diag_coords, &diag_rank);
+    int diag_rank = get_cart_rank(comm, col, col);
 
     /* Get rank for diagonal processor within col_comm */
     int col_diag_rank;
@@ -408,11 +379,8 @@ void distributed_matrix_vector_mult(const int n, double* local_A, double* local_
     MPI_Comm_group(row_comm, &row_group);
 
     /* Get the rank for the first column's processor in the row communicator */
-    int row_group_root_rank, cart_group_root_rank;
-    int row_root_coords[NDIMS];
-    row_root_coords[ROW] = get_row(comm);
-    row_root_coords[COL] = 0;
-    MPI_Cart_rank(comm, row_root_coords, &cart_group_root_rank);
+    int row_group_root_rank;
+    int cart_group_root_rank = get_cart_rank(comm, get_row(comm), 0);
     MPI_Group_translate_ranks(cart_group, 1, &cart_group_root_rank, row_group, &row_group_root_rank);
 
     /* Reduce all partial vectors to the first column's processors */
@@ -443,15 +411,9 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
 
     int num_rows = get_num_rows(comm);
 
-    int rankRoot;
-    int rankRowRoot;
-    int rankRootDiag;
-    int coordsRoot[2] = {0,0};
-    int coordsRowRoot[2] = {row, 0};
-    int coordsRootDiag[2] = {row, row};
-    MPI_Cart_rank(comm, coordsRoot, &rankRoot);
-    MPI_Cart_rank(comm, coordsRowRoot, &rankRowRoot);
-    MPI_Cart_rank(comm, coordsRootDiag, &rankRootDiag);
+    int rankRoot = get_cart_rank(comm, 0, 0);
+    int rankRowRoot = get_cart_rank(comm, row, 0);
+    int rankRootDiag = get_cart_rank(comm, row, row);
 
     int rows = block_decompose(n, num_rows, row);
 
