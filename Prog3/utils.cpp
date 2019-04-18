@@ -55,3 +55,31 @@ int get_num_cols(MPI_Comm comm)
     MPI_Cart_get(comm, NDIMS, dims, period, coords);
     return dims[COL];
 }
+
+static MPI_Comm create_comm_by_dim(MPI_Comm comm, int dim)
+{
+    MPI_Comm new_comm;
+    int remain_dims[NDIMS];
+
+    for (int i=0; i<NDIMS; i++) {
+        if (i == dim) {
+            remain_dims[i] = false;
+        } else {
+            remain_dims[i] = true;
+        }
+    }
+
+    MPI_Cart_sub(comm, remain_dims, &new_comm);
+    return new_comm;
+}
+
+MPI_Comm create_col_comm(MPI_Comm comm)
+{
+    return create_comm_by_dim(comm, COL);
+}
+
+MPI_Comm create_row_comm(MPI_Comm comm)
+{
+    return create_comm_by_dim(comm, ROW);
+
+}

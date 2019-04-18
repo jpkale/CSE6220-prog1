@@ -71,4 +71,12 @@ int get_num_rows(MPI_Comm comm);
 /* Get the number of calls in a cartesian communicator */
 int get_num_cols(MPI_Comm comm);
 
+/* Given a cartesian comm, create a communicator for the processor's column in
+ * that communicator.  Must be freed with MPI_Comm_free */
+MPI_Comm create_col_comm(MPI_Comm comm);
+
+/* Given a cartesian comm, create a communicator for the processor's row in
+ * that communicator.  Must be freed with MPI_Comm_free */
+MPI_Comm create_row_comm(MPI_Comm comm);
+
 #endif // UTILS_H

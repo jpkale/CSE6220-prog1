@@ -41,23 +41,19 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
     int col = get_col(comm);
 
     //Create Column Communicator subset group for scattering vector
-    MPI_Comm colComm;
-    int remain_dims[NDIMS];
-    remain_dims[ROW] = true;
-    remain_dims[COL] = false;
-    MPI_Cart_sub(comm, remain_dims, &colComm);
+    MPI_Comm col_comm = create_col_comm(comm);
 
     // Create communication groups
     MPI_Group cartesianGroup, columnGroup;
     MPI_Comm_group(comm, &cartesianGroup);
-    MPI_Comm_group(colComm, &columnGroup);
+    MPI_Comm_group(col_comm, &columnGroup);
 
     //If not in the first column of processor grid, do nothing
     if (col != 0)
     {
         MPI_Group_free(&cartesianGroup);
         MPI_Group_free(&columnGroup);
-        MPI_Comm_free(&colComm);
+        MPI_Comm_free(&col_comm);
         return;
     }
 
@@ -85,12 +81,13 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
     (*local_vector) = new double[size];
     int translationRank;
     MPI_Group_translate_ranks(cartesianGroup, 1, &rankRoot, columnGroup, &translationRank);
-    MPI_Scatterv(input_vector, count, displs, MPI_DOUBLE, *local_vector, size, MPI_DOUBLE, translationRank, colComm);
+    MPI_Scatterv(input_vector, count, displs, MPI_DOUBLE, *local_vector, size,
+                 MPI_DOUBLE, translationRank, col_comm);
 
 
     MPI_Group_free(&cartesianGroup);
     MPI_Group_free(&columnGroup);
-    MPI_Comm_free(&colComm);
+    MPI_Comm_free(&col_comm);
     delete count;
     delete displs;
     return;
@@ -114,11 +111,7 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
     int col = get_col(comm);
 
     //Create Column Communicator subset group for scattering vector
-    MPI_Comm colComm;
-    int remain_dims[NDIMS];
-    remain_dims[ROW] = true;
-    remain_dims[COL] = false;
-    MPI_Cart_sub(comm, remain_dims, &colComm);
+    MPI_Comm col_comm = create_col_comm(comm);
 
     MPI_Group cartesianGroup, columnGroup;
     MPI_Comm_group(comm, &cartesianGroup);
@@ -129,7 +122,7 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
     {
         MPI_Group_free(&cartesianGroup);
         MPI_Group_free(&columnGroup);
-        MPI_Comm_free(&colComm);
+        MPI_Comm_free(&col_comm);
         return;
     }
 
@@ -160,11 +153,12 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
     int size = block_decompose(n,num_rows, row);
     int translationRank;
     MPI_Group_translate_ranks(cartesianGroup, 1, &rankRoot, columnGroup, &translationRank);
-    MPI_Gatherv(local_vector, size, MPI_DOUBLE, output_vector, count, displs, MPI_DOUBLE, translationRank, colComm);
+    MPI_Gatherv(local_vector, size, MPI_DOUBLE, output_vector, count, displs,
+                MPI_DOUBLE, translationRank, col_comm);
 
     MPI_Group_free(&cartesianGroup);
     MPI_Group_free(&columnGroup);
-    MPI_Comm_free(&colComm);
+    MPI_Comm_free(&col_comm);
     delete count;
     delete displs;
 }
@@ -196,24 +190,17 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
     cart_comm_rows = get_num_rows(comm);
 
     /* Create a communicator for the current column */
-    MPI_Comm colComm;
-    int remain_dims[NDIMS];
-    remain_dims[ROW] = true;
-    remain_dims[COL] = false;
-    MPI_Cart_sub(comm, remain_dims, &colComm);
+    MPI_Comm col_comm = create_col_comm(comm);
 
     /* Create a communicator for the current row */
-    MPI_Comm rowComm;
-    remain_dims[ROW] = false;
-    remain_dims[COL] = true;
-    MPI_Cart_sub(comm, remain_dims, &rowComm);
+    MPI_Comm row_comm = create_row_comm(comm);
 
     /* Get the groups for the current column, row, and cartesian communicators
      * for easy conversion between ranks later */
     MPI_Group groupCart, groupCol, groupRow;
     MPI_Comm_group(comm, &groupCart);
-    MPI_Comm_group(colComm, &groupCol);
-    MPI_Comm_group(rowComm, &groupRow);
+    MPI_Comm_group(col_comm, &groupCol);
+    MPI_Comm_group(row_comm, &groupRow);
 
     /* Distribute matrix among processors in first column */
     double* temp = NULL;
@@ -234,7 +221,8 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
 
         int commRootRank;
         MPI_Group_translate_ranks(groupCart, 1, &cart_root_rank, groupCol, &commRootRank);
-        MPI_Scatterv(input_matrix, count, displs, MPI_DOUBLE, temp, size, MPI_DOUBLE, commRootRank, colComm);
+        MPI_Scatterv(input_matrix, count, displs, MPI_DOUBLE, temp, size,
+                     MPI_DOUBLE, commRootRank, col_comm);
 
         delete count;
         delete displs;
@@ -270,15 +258,15 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
     for (int i=0; i < rows; i++) {
         MPI_Scatterv((temp + i*n), count, displs, MPI_DOUBLE,
                      (*local_matrix + i*columns), columns, MPI_DOUBLE,
-                     commRankRowRoot, rowComm);
+                     commRankRowRoot, row_comm);
     }
 
     /* Clean-up */
     delete count;
     delete displs;
     delete temp;
-    MPI_Comm_free(&rowComm);
-    MPI_Comm_free(&colComm);
+    MPI_Comm_free(&row_comm);
+    MPI_Comm_free(&col_comm);
     MPI_Group_free(&groupCart);
     MPI_Group_free(&groupRow);
     MPI_Group_free(&groupCol);
@@ -346,13 +334,9 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
     /* At this point, the diagonal column has the distributed vector in
      * col_vector */
 
-    MPI_Comm col_comm;
 
     /* Create communicator for column */
-    int remain_dims[NDIMS];
-    remain_dims[ROW] = true;
-    remain_dims[COL] = false;
-    MPI_Cart_sub(comm, remain_dims, &col_comm);
+    MPI_Comm col_comm = create_col_comm(comm);
 
     /* Get rank of diagonal processor in column */
     int diag_rank;
@@ -416,11 +400,7 @@ void distributed_matrix_vector_mult(const int n, double* local_A, double* local_
     }
 
     /* Create communicator for current row */
-    int remain_dims[NDIMS];
-    MPI_Comm row_comm;
-    remain_dims[ROW] = false;
-    remain_dims[COL] = true;
-    MPI_Cart_sub(comm, remain_dims, &row_comm);
+    MPI_Comm row_comm = create_row_comm(comm);
 
     /* Get groups for both the cartesian and row communicators */
     MPI_Group cart_group, row_group;
