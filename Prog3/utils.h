@@ -51,48 +51,24 @@ inline int block_decompose_by_dim(const int n, MPI_Comm comm, int dim)
 #define COL 1
 #define NDIMS 2
 
-/* TODO: Move the all to cpp file, memoize*/
+/* TODO: Move the all to cpp file, memoize */
 
-inline int get_row(MPI_Comm comm)
-{
-    int dims[NDIMS], periods[NDIMS], coords[NDIMS];
-    MPI_Cart_get(comm, NDIMS, dims, periods, coords);
-    return coords[ROW];
-}
+/* Get the current row in a cartesian communicator */
+int get_row(MPI_Comm comm);
 
-inline int get_col(MPI_Comm comm)
-{
-    int dims[NDIMS], periods[NDIMS], coords[NDIMS];
-    MPI_Cart_get(comm, NDIMS, dims, periods, coords);
-    return coords[COL];
-}
+/* Get the current column in a cartesian communicator */
+int get_col(MPI_Comm comm);
 
-inline int get_rank(MPI_Comm comm)
-{
-    int rank;
-    MPI_Comm_rank(comm, &rank);
-    return rank;
-}
+/* Get the rank in a given communicator */
+int get_rank(MPI_Comm comm);
 
-inline int get_cart_root_rank(MPI_Comm comm)
-{
-    int rank, coords[NDIMS];
-    coords[0] = 0;
-    coords[1] = 0;
-    MPI_Cart_rank(comm, coords, &rank);
-    return rank;
-}
+/* Get the rank of the (0,0) processor in a cartesian communicator */
+int get_cart_root_rank(MPI_Comm comm);
 
-inline int get_num_rows(MPI_Comm comm) {
-    int dims[NDIMS], period[NDIMS], coords[NDIMS];
-    MPI_Cart_get(comm, NDIMS, dims, period, coords);
-    return dims[ROW];
-}
+/* Get the number of rows in a cartesian communicator */
+int get_num_rows(MPI_Comm comm);
 
-inline int get_num_cols(MPI_Comm comm) {
-    int dims[NDIMS], period[NDIMS], coords[NDIMS];
-    MPI_Cart_get(comm, NDIMS, dims, period, coords);
-    return dims[COL];
-}
+/* Get the number of calls in a cartesian communicator */
+int get_num_cols(MPI_Comm comm);
 
 #endif // UTILS_H

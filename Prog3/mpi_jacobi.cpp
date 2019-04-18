@@ -191,10 +191,9 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
  */
 void distribute_matrix(const int n, double* input_matrix, double** local_matrix, MPI_Comm comm)
 {
-    int rank, row, col, cart_root_rank;
+    int row, col, cart_root_rank;
 
     /* Get our rank, row, column, and the cart-group's root's rank */
-    rank = get_rank(comm);
     row = get_row(comm);
     col = get_col(comm);
     cart_root_rank = get_cart_root_rank(comm);
