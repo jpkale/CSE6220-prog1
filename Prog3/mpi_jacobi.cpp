@@ -37,21 +37,22 @@
  */
 void distribute_vector(const int n, double* input_vector, double** local_vector, MPI_Comm comm)
 {
+    /* Get processor's row and column in the cartesian communicator */
     int row = get_row(comm);
     int col = get_col(comm);
 
-    //Create Column Communicator subset group for scattering vector
+    /* Create a comlumn communicator for scattering the vector */
     MPI_Comm col_comm = create_col_comm(comm);
 
-
-    //If not in the first column of processor grid, do nothing
+    /* If not in the first column of processor grid, do nothing */
     if (col != 0)
     {
         MPI_Comm_free(&col_comm);
         return;
     }
 
-    //Calculate num of elements for each processor
+    /* Calculate num of elements for each processor.  Populate count and displs
+     * arrays to hold this information to use in our call to MPI_Scatterv */
     int num_rows = get_num_rows(comm);
 
     int* count = new int[num_rows];
@@ -65,10 +66,10 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
         displs[i] = displs[i-1] + count[i-1];
     }
 
-    //Get root rank and coordinates
+    /* Get root rank and coordinates */
     int rank_root = get_cart_rank(comm, 0, 0);
 
-    //Scatter
+    /* Allocate space and scatter */
     int size = block_decompose(n, num_rows, row);
     (*local_vector) = new double[size];
     int translation_rank = translate_cart_to_col_rank(comm, col_comm, rank_root);
@@ -76,11 +77,10 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
                  MPI_DOUBLE, translation_rank, col_comm);
 
 
+    /* Cleanup */
     MPI_Comm_free(&col_comm);
     delete count;
     delete displs;
-    return;
-
 }
 
 /*
@@ -94,30 +94,32 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
 // gather the local vector distributed among (i,0) to the processor (0,0)
 void gather_vector(const int n, double* local_vector, double* output_vector, MPI_Comm comm)
 {
-    //Get rank and coordinates
+    /* Get rank and coordinates */
     int rank = get_rank(comm);
     int row = get_row(comm);
     int col = get_col(comm);
 
-    //Create Column Communicator subset group for scattering vector
+    /* Create Column Communicator subset group for scattering vector */
     MPI_Comm col_comm = create_col_comm(comm);
 
-    //If not in the first column of processor grid, do nothing
+    /* If not in the first column of processor grid, do nothing */
     if (col != 0)
     {
         MPI_Comm_free(&col_comm);
         return;
     }
 
-    //Calculate num of elements for each processor
+    /* Calculate num of elements for each processor*/
     int num_rows = get_num_rows(comm);
 
     int* count = NULL;
     int* displs = NULL;
 
-    //Get root rank and coordinates
+    /* Get root rank and coordinates */
     int rank_root = get_cart_rank(comm, 0, 0);
 
+    /* Populate count and displ arrays with this information for later use in
+     * the MPI_Gatherv call */
     if (rank == rank_root) {
         count = new int[num_rows];
         displs = new int[num_rows];
@@ -130,12 +132,13 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
         }
     }
 
-    //Gather
+    /* Actually perform gather */
     int size = block_decompose(n,num_rows, row);
     int translation_rank = translate_cart_to_col_rank(comm, col_comm, rank_root);
     MPI_Gatherv(local_vector, size, MPI_DOUBLE, output_vector, count, displs,
                 MPI_DOUBLE, translation_rank, col_comm);
 
+    /* Cleanup */
     MPI_Comm_free(&col_comm);
     delete count;
     delete displs;
@@ -173,9 +176,11 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
     /* Distribute matrix among processors in first column */
     double* temp = NULL;
     if (col == 0) {
+        /* Alocate count and displs arrays */
         int* count = new int[cart_comm_cols];
         int* displs = new int[cart_comm_cols];
 
+        /* Populate count and displs arrays */
         displs[0] = 0;
         count[0] = n * block_decompose(n, cart_comm_cols, 0);
 
@@ -184,25 +189,34 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
             displs[i] = displs[i-1] + count[i-1];
         }
 
+        /* Allocate space for scattered data to be received into */
         int size = n * block_decompose(n, cart_comm_cols, col);
         temp = new double[size];
 
+        /* Actually call scatter */
         int comm_root_rank = translate_cart_to_col_rank(comm, col_comm, cart_root_rank);
         MPI_Scatterv(input_matrix, count, displs, MPI_DOUBLE, temp, size,
                      MPI_DOUBLE, comm_root_rank, col_comm);
 
+        /* Free count and displs arrays */
         delete count;
         delete displs;
     }
 
+    /* TODO: Determine if this is absolutely needed.  I forsee this scaling
+     * poorly when p grows.  Alternatively, can we replace comm with row_comm */
     MPI_Barrier(comm);
 
+    /* Get the number of rows and columns in this processor's sub-matrix */
     int rows = block_decompose(n, cart_comm_rows, row);
     int columns = block_decompose(n, cart_comm_cols, col);
     (*local_matrix) = new double[rows*columns];
 
+    /* Get the rank of the first processor in the row */
     int rank_col_root = get_cart_rank(comm, row, 0);
 
+    /* Allocate and fill count and displs arrays for scattering to each
+     * processor in the row */
     int* count = new int[cart_comm_rows];
     int* displs = new int[cart_comm_rows];
     displs[0] = 0;
@@ -244,14 +258,12 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
  */
 void transpose_bcast_vector(const int n, double* col_vector, double* row_vector, MPI_Comm comm)
 {
-    int row, col, vector_size;
-
-    row = get_row(comm);
-    col = get_col(comm);
+    /* Get coordinates */
+    int row = get_row(comm);
+    int col = get_col(comm);
 
     /* Set vector_size to floor(n/q) or ceil(n/q) */
-    vector_size = block_decompose_by_dim(n, comm, ROW);
-
+    int vector_size = block_decompose_by_dim(n, comm, ROW);
 
     if (row != 0) {
         /* 0-th column processor */
@@ -276,9 +288,9 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
         memcpy(row_vector, col_vector, vector_size * sizeof(double));
     }
 
+
     /* At this point, the diagonal column has the distributed vector in
      * col_vector */
-
 
     /* Create communicator for column */
     MPI_Comm col_comm = create_col_comm(comm);
@@ -309,15 +321,13 @@ void transpose_bcast_vector(const int n, double* col_vector, double* row_vector,
  */
 void distributed_matrix_vector_mult(const int n, double* local_A, double* local_x, double* local_y, MPI_Comm comm)
 {
-    int num_rows, num_cols;
-    std::vector<double> transposed_x(n);
-
     /* Transpose x and distribute */
+    std::vector<double> transposed_x(n);
     transpose_bcast_vector(n, local_x, &transposed_x[0], comm);
 
     /* Determine num_rows */
-    num_rows = block_decompose_by_dim(n, comm, ROW);
-    num_cols = block_decompose_by_dim(n, comm, COL);
+    int num_rows = block_decompose_by_dim(n, comm, ROW);
+    int num_cols = block_decompose_by_dim(n, comm, COL);
 
     /* Allocate new vector for partial result */
     std::vector<double> partial_res(num_rows);
@@ -343,6 +353,9 @@ void distributed_matrix_vector_mult(const int n, double* local_A, double* local_
 
     /* Reduce all partial vectors to the first column's processors */
     MPI_Reduce(&partial_res[0], local_y, num_rows, MPI_DOUBLE, MPI_SUM, row_root_rank, row_comm);
+
+    /* Cleanup */
+    MPI_Comm_free(&row_comm);
 }
 
 /*
@@ -456,6 +469,7 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
         }
     }
 
+    /* Cleanup */
     delete resultAx;
     delete diagonal;
     MPI_Comm_free(&col_comm);
