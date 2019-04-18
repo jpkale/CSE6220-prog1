@@ -37,12 +37,8 @@
  */
 void distribute_vector(const int n, double* input_vector, double** local_vector, MPI_Comm comm)
 {
-	int rank = 0;
-	int coordinates[NDIMS];
-	
-	//Get rank and coordinates
-	MPI_Comm_rank(comm, &rank);
-	MPI_Cart_coords(comm, rank, NDIMS, coordinates);
+    int row = get_row(comm);
+    int col = get_col(comm);
 	
 	//Create Column Communicator subset group for scattering vector
 	MPI_Comm colComm;
@@ -57,7 +53,7 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
 	MPI_Comm_group(colComm, &columnGroup);
 	
 	//If not in the first column of processor grid, do nothing
-	if (coordinates[COL] != 0)
+	if (col != 0)
 	{
 		MPI_Group_free(&cartesianGroup);
 		MPI_Group_free(&columnGroup);
@@ -66,17 +62,16 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
 	}
 	
 	//Calculate num of elements for each processor
-	int dims[NDIMS], periods[NDIMS], coords[NDIMS];
-	MPI_Cart_get(comm,NDIMS,dims,periods,coords);
+    int num_rows = get_num_rows(comm);
 	
-	int* count = new int[dims[ROW]];
-	count[0] = block_decompose(n,dims[ROW],0);
+	int* count = new int[num_rows];
+	count[0] = block_decompose(n,num_rows,0);
 	
-	int* displs = new int[dims[ROW]];
+	int* displs = new int[num_rows];
 	displs[0] = 0;
 	
-	for (int i=1; i < dims[ROW]; i++) {
-		count[i] = block_decompose(n,dims[ROW],i);
+	for (int i=1; i < num_rows; i++) {
+		count[i] = block_decompose(n,num_rows,i);
 		displs[i] = displs[i-1] + count[i-1];
 	}
 	
@@ -86,7 +81,7 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
 	MPI_Cart_rank(comm, coordRoot, &rankRoot);
 
 	//Scatter
-	int size = block_decompose(n, dims[ROW], coordinates[ROW]);
+	int size = block_decompose(n, num_rows, row);
 	(*local_vector) = new double[size];
 	int translationRank;
 	MPI_Group_translate_ranks(cartesianGroup, 1, &rankRoot, columnGroup, &translationRank);
@@ -113,12 +108,10 @@ void distribute_vector(const int n, double* input_vector, double** local_vector,
 // gather the local vector distributed among (i,0) to the processor (0,0)
 void gather_vector(const int n, double* local_vector, double* output_vector, MPI_Comm comm)
 {
-	int rank = 0;
-	int coordinates[NDIMS];
-	
 	//Get rank and coordinates
-	MPI_Comm_rank(comm, &rank);
-	MPI_Cart_coords(comm, rank, NDIMS, coordinates);
+    int rank = get_rank(comm);
+    int row = get_row(comm);
+    int col = get_col(comm);
 	
 	//Create Column Communicator subset group for scattering vector
 	MPI_Comm colComm;
@@ -132,7 +125,7 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
 	MPI_Comm_group(comm, &columnGroup);
 	
 	//If not in the first column of processor grid, do nothing
-	if (coordinates[COL] != 0)
+	if (col != 0)
 	{
 		MPI_Group_free(&cartesianGroup);
 		MPI_Group_free(&columnGroup);
@@ -141,8 +134,7 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
 	}
 	
 	//Calculate num of elements for each processor
-	int dims[NDIMS], periods[NDIMS], coords[NDIMS];
-	MPI_Cart_get(comm,NDIMS,dims,periods,coords);
+    int num_rows = get_num_rows(comm);
 	
 	int* count = NULL;
 	int* displs = NULL;
@@ -153,19 +145,19 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
 	MPI_Cart_rank(comm, coordRoot, &rankRoot);
 	
 	if (rank == rankRoot) {
-		count = new int[dims[ROW]];
-		displs = new int[dims[ROW]];
-		count[0] = block_decompose(n, dims[ROW], 0);
+		count = new int[num_rows];
+		displs = new int[num_rows];
+		count[0] = block_decompose(n, num_rows, 0);
 		displs[0] = 0;
 		
-		for (int i=0; i < dims[ROW]; i++) {
-			count[i] = block_decompose(n,dims[ROW],i);
+		for (int i=0; i < num_rows; i++) {
+			count[i] = block_decompose(n,num_rows,i);
 			displs[i] = displs[i-1] + count[i-1];
 		}
 	}
 	
 	//Gather
-	int size = block_decompose(n,dims[ROW], coordinates[ROW]);
+	int size = block_decompose(n,num_rows, row);
 	int translationRank;
 	MPI_Group_translate_ranks(cartesianGroup, 1, &rankRoot, columnGroup, &translationRank);
 	MPI_Gatherv(local_vector, size, MPI_DOUBLE, output_vector, count, displs, MPI_DOUBLE, translationRank, colComm);
@@ -175,7 +167,6 @@ void gather_vector(const int n, double* local_vector, double* output_vector, MPI
 	MPI_Comm_free(&colComm);
 	delete count;
 	delete displs;
-	return;
 }
 
 /*
@@ -291,8 +282,6 @@ void distribute_matrix(const int n, double* input_matrix, double** local_matrix,
 	MPI_Group_free(&groupCart);
 	MPI_Group_free(&groupRow);
 	MPI_Group_free(&groupCol);
-	return;
-	
 }
 
 /*
@@ -468,30 +457,26 @@ void distributed_matrix_vector_mult(const int n, double* local_A, double* local_
 void distributed_jacobi(const int n, double* local_A, double* local_b, double* local_x,
                 MPI_Comm comm, int max_iter, double l2_termination)
 {
-    int rank;
-	int coordinates[2];
-	MPI_Comm_rank(comm, &rank);
-	MPI_Cart_coords(comm, rank, 2, coordinates);
+    int rank = get_rank(comm);
+    int row = get_row(comm);
+    int col = get_col(comm);
 	
-	int dims[2];
-	int period[2];
-	int coords[2];
-	MPI_Cart_get(comm,2,dims,period,coords);
+    int num_rows = get_num_rows(comm);
 	
 	int rankRoot;	
 	int rankRowRoot;
 	int rankRootDiag;
 	int coordsRoot[2] = {0,0};
-	int coordsRowRoot[2] = {coordinates[0], 0};
-	int coordsRootDiag[2] = {coordinates[0], coordinates[0]};
+	int coordsRowRoot[2] = {row, 0};
+	int coordsRootDiag[2] = {row, row};
 	MPI_Cart_rank(comm, coordsRoot, &rankRoot);
 	MPI_Cart_rank(comm, coordsRowRoot, &rankRowRoot);
 	MPI_Cart_rank(comm, coordsRootDiag, &rankRootDiag);
 	
-	int rows = block_decompose(n, dims[0], coordinates[0]);
+	int rows = block_decompose(n, num_rows, row);
 	
 	double* diagonal = NULL;
-	if(coordinates[1] == 0) {
+	if(col == 0) {
 		diagonal = new double[rows];
 		
 		if (rank != rankRootDiag) {
@@ -516,7 +501,7 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
 	}
 	
 	double* resultAx = NULL;
-	if (coordinates[1] == 0) {
+	if (col == 0) {
 		resultAx = new double[rows];
 	}
 	
@@ -538,7 +523,7 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
 	while(1) {
 		distributed_matrix_vector_mult(n, local_A, local_x, resultAx, comm);
 		
-		if (coordinates[1] == 0) {
+		if (col == 0) {
 			resultLocal = 0;
 			for(int i = 0; i < rows; i++) {
 				resultLocal = resultLocal + (resultAx[i] - local_b[i]) * (resultAx[i] - local_b[i]);
@@ -559,7 +544,7 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
 				break;
 			}
 			else {
-				if (coordinates[1] == 0) {
+				if (col == 0) {
 					for (int i=0; i < rows; i++) {
 						local_x[i] = (local_b[i] - resultAx[i] + diagonal[i]*local_x[i]) / diagonal[i];
 					}
@@ -584,10 +569,6 @@ void distributed_jacobi(const int n, double* local_A, double* local_b, double* l
 	MPI_Comm_free(&colComm);
 	MPI_Group_free(&groupCart);
 	MPI_Group_free(&groupCol);
-	
-	return;
-	
-
 }
 
 /*
