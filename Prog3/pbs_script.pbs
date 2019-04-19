@@ -1,17 +1,47 @@
 #!/bin/sh
 
 #PBS -q coc-ice-multi
-#PBS -l nodes=4:ppn=16
+#PBS -l nodes=8:ppn=16
 #PBS -l walltime=00:10:00
 #PBS -N PA3
 #PBS -o $PBS_JOBID.out
 #PBS -e $PBS_JOBID.err
 #PBS -m abe
-#PBS -M cbaumann7@gatech.edu
+#PBS -M jkale3@gatech.edu
 
 # change to our project directory
 cd ~/CSE6220-prog1/Prog3/
 module load gcc mvapich2/2.2
 make all
 make test
-#mpirun -np 64 ./jacobi -n 10000 -d 0.5
+
+# Correctness tests
+python generate_tests.py 10
+mpirun -np 4 ./jacobi input_A.bin input_b.bin output.bin
+python check_output.py input_A.bin input_b.bin output.bin
+mpirun -np 16 ./jacobi input_A.bin input_b.bin output.bin
+python check_output.py input_A.bin input_b.bin output.bin
+mpirun -np 64 ./jacobi input_A.bin input_b.bin output.bin
+python check_output.py input_A.bin input_b.bin output.bin
+mpirun -np 100 ./jacobi input_A.bin input_b.bin output.bin
+python check_output.py input_A.bin input_b.bin output.bin
+
+python generate_tests.py 100
+mpirun -np 4 ./jacobi input_A.bin input_b.bin output.bin
+python check_output.py input_A.bin input_b.bin output.bin
+mpirun -np 16 ./jacobi input_A.bin input_b.bin output.bin
+python check_output.py input_A.bin input_b.bin output.bin
+mpirun -np 64 ./jacobi input_A.bin input_b.bin output.bin
+python check_output.py input_A.bin input_b.bin output.bin
+mpirun -np 100 ./jacobi input_A.bin input_b.bin output.bin
+python check_output.py input_A.bin input_b.bin output.bin
+
+python generate_tests.py 1000
+mpirun -np 4 ./jacobi input_A.bin input_b.bin output.bin
+python check_output.py input_A.bin input_b.bin output.bin
+mpirun -np 16 ./jacobi input_A.bin input_b.bin output.bin
+python check_output.py input_A.bin input_b.bin output.bin
+mpirun -np 64 ./jacobi input_A.bin input_b.bin output.bin
+python check_output.py input_A.bin input_b.bin output.bin
+mpirun -np 100 ./jacobi input_A.bin input_b.bin output.bin
+python check_output.py input_A.bin input_b.bin output.bin
