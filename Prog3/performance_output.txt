@@ -1,0 +1,371 @@
+---------------------------------------
+Begin PBS Prologue Thu Apr 18 22:43:21 EDT 2019
+Job ID:     102892.ice-sched.pace.gatech.edu
+User ID:    jkale3
+Job name:   PA3
+Queue:      coc-ice-multi
+End PBS Prologue Thu Apr 18 22:43:21 EDT 2019
+---------------------------------------
+mpic++ -Wall -O3 -I.  -c main.cpp
+mpic++ -Wall -O3 -I.  -c jacobi.cpp
+mpic++ -Wall -O3 -I.  -c mpi_jacobi.cpp
+mpic++ -Wall -O3 -I.  -c utils.cpp
+mpic++  -o jacobi main.o jacobi.o mpi_jacobi.o utils.o
+mpic++ -Wall -O3 -I.  -c seq_tests.cpp
+mpic++ -Wall -O3 -I.  -c mpi_gtest.cpp
+mpic++ -Wall -O3 -I.  -c ./gtest/gtest-all.cc
+mpic++  -o seq_tests seq_tests.o mpi_gtest.o gtest-all.o jacobi.o utils.o
+mpic++ -Wall -O3 -I.  -c mpi_tests.cpp
+mpic++  -o mpi_tests mpi_tests.o mpi_gtest.o gtest-all.o mpi_jacobi.o jacobi.o utils.o
+echo "### TESTING SEQUENTIAL CODE ###";./seq_tests; \
+	echo "### TESTING WITH 4 PROCESSES ###"; mpirun -np 4 ./mpi_tests \
+	echo "### TESTING WITH 9 PROCESSES ###"; mpirun -np 9 ./mpi_tests
+### TESTING SEQUENTIAL CODE ###
+Running GTEST with MPI with 1 processes.
+[==========] Running 2 tests from 1 test case.
+[----------] Global test environment set-up.
+[----------] 2 tests from SequentialTest
+[ RUN      ] SequentialTest.MatrixVectorMult1
+[       OK ] SequentialTest.MatrixVectorMult1 (0 ms)
+[ RUN      ] SequentialTest.Jacobi1
+[       OK ] SequentialTest.Jacobi1 (0 ms)
+[----------] 2 tests from SequentialTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 2 tests from 1 test case ran. (0 ms total)
+[  PASSED  ] 2 tests.
+### TESTING WITH 4 PROCESSES ###
+Running GTEST with MPI with 4 processes.
+[==========] Running 5 tests from 1 test case.
+[----------] Global test environment set-up.
+[----------] 5 tests from MpiTest
+[ RUN      ] MpiTest.MatrixVectorMult1
+[       OK ] MpiTest.MatrixVectorMult1 (1 ms)
+[ RUN      ] MpiTest.MatrixVectorMult2
+[       OK ] MpiTest.MatrixVectorMult2 (1 ms)
+[ RUN      ] MpiTest.MatrixVectorMult3
+[       OK ] MpiTest.MatrixVectorMult3 (0 ms)
+[ RUN      ] MpiTest.Jacobi1
+[       OK ] MpiTest.Jacobi1 (1 ms)
+[ RUN      ] MpiTest.JacobiCrossTest1
+[       OK ] MpiTest.JacobiCrossTest1 (2 ms)
+[----------] 5 tests from MpiTest (5 ms total)
+
+[----------] Global test environment tear-down
+[==========] 5 tests from 1 test case ran. (5 ms total)
+[  PASSED  ] 5 tests.
+Running GTEST with MPI with 9 processes.
+[==========] Running 5 tests from 1 test case.
+[----------] Global test environment set-up.
+[----------] 5 tests from MpiTest
+[ RUN      ] MpiTest.MatrixVectorMult1
+[       OK ] MpiTest.MatrixVectorMult1 (172 ms)
+[ RUN      ] MpiTest.MatrixVectorMult2
+[       OK ] MpiTest.MatrixVectorMult2 (161 ms)
+[ RUN      ] MpiTest.MatrixVectorMult3
+[       OK ] MpiTest.MatrixVectorMult3 (140 ms)
+[ RUN      ] MpiTest.Jacobi1
+[       OK ] MpiTest.Jacobi1 (158 ms)
+[ RUN      ] MpiTest.JacobiCrossTest1
+[       OK ] MpiTest.JacobiCrossTest1 (3 ms)
+[----------] 5 tests from MpiTest (634 ms total)
+
+[----------] Global test environment tear-down
+[==========] 5 tests from 1 test case ran. (634 ms total)
+[  PASSED  ] 5 tests.
+-------------------------------------------------------------------------
+Small/easy matrix test (n=100, d=0.25)
+p=4
+0.00171593
+p=9
+1.24511
+p=16
+1.15936
+p=25
+0.0126128
+p=36
+0.8593
+p=49
+0.314158
+p=64
+0.40509
+p=81
+0.972287
+p=100
+1.24274
+p=121
+0.193513
+-------------------------------------------------------------------------
+Small/medium matrix test (n=100, d=0.5)
+p=4
+0.00216694
+p=9
+0.93085
+p=16
+2.09991
+p=25
+0.707234
+p=36
+0.0786042
+p=49
+0.549388
+p=64
+0.395803
+p=81
+0.351263
+p=100
+2.13023
+p=121
+1.75426
+-------------------------------------------------------------------------
+Small/hard matrix test (n=100, d=0.75)
+p=4
+0.00258842
+p=9
+0.00355086
+p=16
+3.93209
+p=25
+0.416636
+p=36
+0.436164
+p=49
+0.0417456
+p=64
+0.44606
+p=81
+0.50058
+p=100
+0.199646
+p=121
+0.13832
+-------------------------------------------------------------------------
+Small/very hard matrix test (n=100, d=1.0)
+p=4
+0.0031227
+p=9
+1.62556
+p=16
+3.46219
+p=25
+0.32167
+p=36
+0.211962
+p=49
+0.0415128
+p=64
+1.72444
+p=81
+2.53539
+p=100
+1.57164
+p=121
+0.439595
+-------------------------------------------------------------------------
+Medium/easy matrix test (n=1000, d=0.25)
+p=4
+0.0128557
+p=9
+1.45212
+p=16
+1.07752
+p=25
+0.0205582
+p=36
+0.201518
+p=49
+0.048917
+p=64
+0.174742
+p=81
+0.158283
+p=100
+1.37487
+p=121
+0.365719
+-------------------------------------------------------------------------
+Medium/medium matrix test (n=1000, d=0.5)
+p=4
+0.0163509
+p=9
+2.79757
+p=16
+0.940091
+p=25
+0.0230485
+p=36
+0.0223789
+p=49
+0.0257771
+p=64
+0.0230166
+p=81
+0.179237
+p=100
+0.159179
+p=121
+3.24594
+-------------------------------------------------------------------------
+Medium/hard matrix test (n=1000, d=0.75)
+p=4
+0.0242882
+p=9
+0.0167518
+p=16
+1.01423
+p=25
+0.368665
+p=36
+0.148476
+p=49
+0.0870747
+p=64
+0.621802
+p=81
+0.362342
+p=100
+0.149096
+p=121
+0.798377
+-------------------------------------------------------------------------
+Medium/very hard matrix test (n=1000, d=1.0)
+p=4
+0.0337886
+p=9
+2.02152
+p=16
+4.51097
+p=25
+0.100579
+p=36
+0.433715
+p=49
+0.189203
+p=64
+0.579854
+p=81
+0.158537
+p=100
+0.40473
+p=121
+0.287302
+-------------------------------------------------------------------------
+Large/easy matrix test (n=10000, d=0.25)
+p=4
+1.02201
+p=9
+0.55632
+p=16
+0.429661
+p=25
+0.356292
+p=36
+0.359023
+p=49
+0.327118
+p=64
+0.322932
+p=81
+0.3654
+p=100
+0.370399
+p=121
+1.40672
+-------------------------------------------------------------------------
+Large/medium matrix test (n=10000, d=0.5)
+p=4
+1.4951
+p=9
+0.810954
+p=16
+0.636597
+p=25
+0.473584
+p=36
+0.45157
+p=49
+0.399777
+p=64
+0.38442
+p=81
+0.43392
+p=100
+0.387484
+p=121
+2.42685
+-------------------------------------------------------------------------
+Large/hard matrix test (n=10000, d=0.75)
+p=4
+2.36747
+p=9
+1.23387
+p=16
+0.963124
+p=25
+0.696653
+p=36
+0.612007
+p=49
+0.629834
+p=64
+0.483077
+p=81
+0.485011
+p=100
+1.41985
+p=121
+0.724489
+-------------------------------------------------------------------------
+Large/very hard matrix test (n=10000, d=1.0)
+p=4
+3.22703
+p=9
+1.64337
+p=16
+1.30562
+p=25
+0.924075
+p=36
+1.16837
+p=49
+0.658379
+p=64
+0.582016
+p=81
+0.580033
+p=100
+0.577528
+p=121
+3.81294
+-------------------------------------------------------------------------
+Extra-Large/easy matrix test (n=30000, d=0.25)
+p=4
+9.03013
+p=9
+5.03189
+p=16
+3.88655
+p=25
+6.21028
+p=36
+3.97563
+p=49
+9.04815
+p=64
+2.72549
+p=81
+---------------------------------------
+Begin PBS Epilogue Thu Apr 18 23:04:55 EDT 2019
+Job ID:     102892.ice-sched.pace.gatech.edu
+User ID:    jkale3
+Job name:   PA3
+Resources:  neednodes=8:ppn=16,nodes=8:ppn=16,walltime=00:20:00
+Rsrc Used:  cput=01:17:06,energy_used=0,mem=15047656kb,vmem=29420424kb,walltime=00:21:26
+Queue:      coc-ice-multi
+Nodes:     
+rich133-h35-16-r.pace.gatech.edu rich133-h35-17-l.pace.gatech.edu 
+rich133-h35-17-r.pace.gatech.edu rich133-h35-18-l.pace.gatech.edu 
+rich133-h35-18-r.pace.gatech.edu rich133-k40-20-r.pace.gatech.edu 
+rich133-k40-21-l.pace.gatech.edu rich133-k40-21-r.pace.gatech.edu
+End PBS Epilogue Thu Apr 18 23:04:56 EDT 2019
+---------------------------------------
