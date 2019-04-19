@@ -2,7 +2,7 @@
 
 #PBS -q coc-ice-multi
 #PBS -l nodes=8:ppn=16
-#PBS -l walltime=00:20:00
+#PBS -l walltime=01:00:00
 #PBS -N PA3
 #PBS -o $PBS_JOBID.out
 #PBS -e $PBS_JOBID.err
